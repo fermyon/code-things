@@ -5,6 +5,12 @@ name = "code-social"
 trigger = { type = "http", base = "/" }
 version = "0.1.0"
 
+[variables]
+db_user = { default = "code-social" }
+db_pswd = { default = "password" }
+db_host = { default = "127.0.0.1" }
+db_name = { default = "code_social" }
+
 [[component]]
 id = "profile-api"
 source = "api/profile/target/wasm32-wasi/release/profile_api.wasm"
@@ -13,3 +19,5 @@ route = "/api/profile/..."
 [component.build]
 command = "cargo build --target wasm32-wasi --release"
 workdir = "api/profile"
+[component.config]
+db_url = "mysql://{{db_user}}:{{db_pswd}}@{{db_host}}/{{db_name}}"
