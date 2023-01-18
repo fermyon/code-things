@@ -1,0 +1,14 @@
+spin_version = "1"
+authors = ["Justin Pflueger <justin.pflueger@fermyon.com>"]
+description = "Social media app for code snippets"
+name = "profile-api"
+trigger = { type = "http", base = "/" }
+version = "0.1.0"
+
+[[component]]
+id = "profile-api"
+source = "target/wasm32-wasi/release/profile_api.wasm"
+[component.trigger]
+route = "/api/profile/..."
+[component.build]
+command = "cargo build --target wasm32-wasi --release"
