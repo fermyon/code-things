@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Result, Ok};
 use bytes::Bytes;
 use http::HeaderMap;
@@ -5,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use spin_sdk::mysql::{self, ParameterValue, Decode};
 
-use crate::utils::get_last_param_from_route;
+use crate::utils::{get_last_param_from_route, get_column_lookup};
 
 fn as_param<'a>(value: &'a Option<String>) -> Option<ParameterValue<'a>> {
     match value {
@@ -46,10 +48,10 @@ impl Profile {
         Ok(serde_json::from_slice(&b)?)
     }
 
-    fn from_row(row: &spin_sdk::mysql::Row) -> Result<Self> {
-        let id = String::decode(&row[0]).ok();
-        let handle = String::decode(&row[1])?;
-        let avatar = String::decode(&row[2]).ok();
+    fn from_row(row: &spin_sdk::mysql::Row, columns: &HashMap<&str, usize>) -> Result<Self> {
+        let id = String::decode(&row[columns["id"]]).ok();
+        let handle = String::decode(&row[columns["handle"]])?;
+        let avatar = String::decode(&row[columns["avatar"]]).ok();
         Ok(Profile {
             id,
             handle,
@@ -73,8 +75,11 @@ impl Profile {
     pub(crate) fn get_by_handle(handle: &str, db_url: &str) -> Result<Profile> {
         let params = vec![ParameterValue::Str(handle)];
         let row_set = mysql::query(db_url, "SELECT id, handle, avatar from profiles WHERE handle = ?", &params)?;
+
+        let columns = get_column_lookup(&row_set.columns);
+
         match row_set.rows.first() {
-            Some(row) => Profile::from_row(row),
+            Some(row) => Profile::from_row(row, &columns),
             None => Err(anyhow!("Profile not found for handle '{:?}'", handle))
         }
     }

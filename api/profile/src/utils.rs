@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
-use spin_sdk::http::Response;
+use spin_sdk::{http::Response, mysql::Column};
 
 pub(crate) fn internal_server_error(err: String) -> Result<Response> {
     Ok(http::Response::builder()
@@ -44,4 +46,12 @@ pub(crate) fn get_params_from_route(route: &str) -> Vec<String> {
 
 pub(crate) fn get_last_param_from_route(route: &str) -> Option<String> {
     get_params_from_route(route).last().cloned()
+}
+
+pub(crate) fn get_column_lookup<'a>(columns: &'a Vec<Column>) -> HashMap<&'a str, usize> {
+    columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.name.as_str(), i))
+        .collect::<HashMap<&str, usize>>()
 }
