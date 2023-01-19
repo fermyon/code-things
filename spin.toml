@@ -1,15 +1,15 @@
 spin_version = "1"
 authors = ["Justin Pflueger <justin.pflueger@fermyon.com>"]
 description = "Social media app for code snippets"
-name = "code-social"
+name = "code-things"
 trigger = { type = "http", base = "/" }
 version = "0.1.0"
 
 [variables]
-db_user = { default = "code-social" }
+db_user = { default = "code-things" }
 db_pswd = { default = "password" }
 db_host = { default = "127.0.0.1" }
-db_name = { default = "code_social" }
+db_name = { default = "code_things" }
 
 [[component]]
 id = "profile-api"

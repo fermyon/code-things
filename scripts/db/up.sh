@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-name=code-social-mysql
+name=code-things-mysql
 image=mysql
-username=code-social
+username=code-things
 password=password
-dbname=code_social
+dbname=code_things
 
 [[ $(docker ps -f "name=$name" --format '{{.Names}}') == $name ]] || docker run -d \
     --name "$name" \
