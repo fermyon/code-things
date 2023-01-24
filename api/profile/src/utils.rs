@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use spin_sdk::{http::Response, mysql::Column};
+use spin_sdk::{http::Response, pg::Column};
 
 pub(crate) fn internal_server_error(err: String) -> Result<Response> {
     Ok(http::Response::builder()

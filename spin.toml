@@ -20,4 +20,4 @@ route = "/api/profile/..."
 command = "cargo build --target wasm32-wasi --release"
 workdir = "api/profile"
 [component.config]
-db_url = "mysql://{{db_user}}:{{db_pswd}}@{{db_host}}/{{db_name}}"
+db_url = "host={{db_host}} user={{db_user}} password={{db_pswd}} dbname={{db_name}}"

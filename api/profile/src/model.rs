@@ -5,7 +5,7 @@ use bytes::Bytes;
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 
-use spin_sdk::mysql::{self, ParameterValue, Decode};
+use spin_sdk::pg::{self as db, Decode, ParameterValue, Row};
 
 use crate::utils::{get_last_param_from_route, get_column_lookup};
 
@@ -48,7 +48,7 @@ impl Profile {
         Ok(serde_json::from_slice(&b)?)
     }
 
-    fn from_row(row: &spin_sdk::mysql::Row, columns: &HashMap<&str, usize>) -> Result<Self> {
+    fn from_row(row: &Row, columns: &HashMap<&str, usize>) -> Result<Self> {
         let id = String::decode(&row[columns["id"]]).ok();
         let handle = String::decode(&row[columns["handle"]])?;
         let avatar = String::decode(&row[columns["avatar"]]).ok();
@@ -68,13 +68,13 @@ impl Profile {
                 None => ParameterValue::DbNull,
             }
         ];
-        mysql::execute(db_url, "INSERT INTO profiles (id, handle, avatar) VALUES (?, ?, ?)", &params)?;
+        db::execute(db_url, "INSERT INTO profiles (id, handle, avatar) VALUES ($1, $2, $3)", &params)?;
         Ok(())
     }
 
     pub(crate) fn get_by_handle(handle: &str, db_url: &str) -> Result<Profile> {
         let params = vec![ParameterValue::Str(handle)];
-        let row_set = mysql::query(db_url, "SELECT id, handle, avatar from profiles WHERE handle = ?", &params)?;
+        let row_set = db::query(db_url, "SELECT id, handle, avatar from profiles WHERE handle = $1", &params)?;
 
         let columns = get_column_lookup(&row_set.columns);
 
@@ -92,14 +92,14 @@ impl Profile {
                     as_nullable_param(&self.avatar),
                     ParameterValue::Str(id.as_str()),
                 ];
-                mysql::execute(db_url, "UPDATE profiles SET handle=?, avatar=? WHERE id=?", &params)?
+                db::execute(db_url, "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3", &params)?;
             },
             None => {
                 let params = vec![
                     as_nullable_param(&self.avatar),
                     ParameterValue::Str(self.handle.as_str())
                 ];
-                mysql::execute(db_url, "UPDATE profiles SET avatar=? WHERE handle=?", &params)?
+                db::execute(db_url, "UPDATE profiles SET avatar=$1 WHERE handle=$2", &params)?;
             }
         }
         Ok(())
@@ -111,13 +111,13 @@ impl Profile {
                 let params = vec![
                     ParameterValue::Str(id.as_str())
                 ];
-                mysql::execute(db_url, "DELETE FROM profiles WHERE id=?", &params)?
+                db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)?;
             },
             None => {
                 let params = vec![
                     ParameterValue::Str(self.handle.as_str())
                 ];
-                mysql::execute(db_url, "DELETE FROM profiles WHERE handle=?", &params)?
+                db::execute(db_url, "DELETE FROM profiles WHERE handle=$1", &params)?;
             }
         }
         Ok(())
