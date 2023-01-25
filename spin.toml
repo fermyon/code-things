@@ -12,6 +12,19 @@ db_host = { default = "127.0.0.1" }
 db_name = { default = "code_things" }
 
 [[component]]
+id = "web"
+source = "modules/spin_static_fs.wasm"
+environment = { FALLBACK_PATH = "index.html" }
+[[component.files]]
+source = "web/dist"
+destination = "/"
+[component.trigger]
+route = "/..."
+[component.build]
+command = "npm run build"
+workdir = "web"
+
+[[component]]
 id = "profile-api"
 source = "api/profile/target/wasm32-wasi/release/profile_api.wasm"
 [component.trigger]
