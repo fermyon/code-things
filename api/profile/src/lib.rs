@@ -1,14 +1,14 @@
-mod model;
 mod config;
+mod model;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
+use config::Config;
+use model::Profile;
 use spin_sdk::{
     http::{Request, Response},
     http_component,
 };
-use config::Config;
-use model::Profile;
 
 enum Api {
     Create(model::Profile),
@@ -39,7 +39,9 @@ fn api_from_request(req: &Request) -> Api {
     let method = req.method().to_owned();
     let profile = match method {
         http::Method::GET | http::Method::DELETE => Profile::from_path(&req.headers()),
-        http::Method::PUT | http::Method::POST => Profile::from_bytes(req.body().as_ref().unwrap_or(&Bytes::new())),
+        http::Method::PUT | http::Method::POST => {
+            Profile::from_bytes(req.body().as_ref().unwrap_or(&Bytes::new()))
+        }
         _ => Err(anyhow!("Unsupported Http Method")),
     };
 
@@ -60,15 +62,17 @@ fn handle_create(db_url: &str, model: Profile) -> Result<Response> {
     model.insert(db_url)?;
     Ok(http::Response::builder()
         .status(http::StatusCode::CREATED)
-        .header(http::header::LOCATION, format!("/api/profile/{}", model.handle))
-        .body(None)?
-    )
+        .header(
+            http::header::LOCATION,
+            format!("/api/profile/{}", model.handle),
+        )
+        .body(None)?)
 }
 
 fn handle_read_by_handle(db_url: &str, handle: String) -> Result<Response> {
     match Profile::get_by_handle(handle.as_str(), &db_url) {
         Ok(model) => ok(serde_json::to_string(&model)?),
-        Err(_) => not_found()
+        Err(_) => not_found(),
     }
 }
 
@@ -80,7 +84,7 @@ fn handle_update(db_url: &str, model: Profile) -> Result<Response> {
 fn handle_delete_by_handle(db_url: &str, model: Profile) -> Result<Response> {
     match model.delete(&db_url) {
         Ok(_) => no_content(),
-        Err(_) => internal_server_error(String::from("Error while deleting profile"))
+        Err(_) => internal_server_error(String::from("Error while deleting profile")),
     }
 }
 
