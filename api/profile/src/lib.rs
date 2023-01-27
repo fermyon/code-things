@@ -1,7 +1,7 @@
 mod model;
 mod config;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use spin_sdk::{
     http::{Request, Response},
@@ -24,7 +24,7 @@ enum Api {
 fn profile_api(req: Request) -> Result<Response> {
     let cfg = Config::default();
 
-    match api_from_request(req) {
+    match api_from_request(&req) {
         Api::BadRequest => bad_request(),
         Api::MethodNotAllowed => method_not_allowed(),
         Api::Create(model) => handle_create(&cfg.db_url, model),
@@ -35,24 +35,23 @@ fn profile_api(req: Request) -> Result<Response> {
     }
 }
 
-fn api_from_request(req: Request) -> Api {
-    match *req.method() {
-        http::Method::POST => match Profile::from_bytes(req.body().as_ref().unwrap_or(&Bytes::new())) {
-            Ok(model) => Api::Create(model),
-            Err(_) => Api::BadRequest,
-        }
-        http::Method::GET => match Profile::from_path(&req.headers()) {
-            Ok(model) => Api::ReadByHandle(model.handle),
-            Err(_) => Api::NotFound,
-        },
-        http::Method::PUT => match Profile::from_bytes(req.body().as_ref().unwrap_or(&Bytes::new())) {
-            Ok(model) => Api::Update(model),
-            Err(_) => Api::BadRequest,
-        },
-        http::Method::DELETE => match Profile::from_path(&req.headers()) {
-            Ok(model) => Api::Delete(model),
-            Err(_) => Api::NotFound,
-        },
+fn api_from_request(req: &Request) -> Api {
+    let method = req.method().to_owned();
+    let profile = match method {
+        http::Method::GET | http::Method::DELETE => Profile::from_path(&req.headers()),
+        http::Method::PUT | http::Method::POST => Profile::from_bytes(req.body().as_ref().unwrap_or(&Bytes::new())),
+        _ => Err(anyhow!("Unsupported Http Method")),
+    };
+
+    match (method, profile) {
+        (http::Method::POST, Ok(profile)) => Api::Create(profile),
+        (http::Method::POST, Err(_)) => Api::BadRequest,
+        (http::Method::GET, Ok(profile)) => Api::ReadByHandle(profile.handle),
+        (http::Method::GET, Err(_)) => Api::NotFound,
+        (http::Method::PUT, Ok(profile)) => Api::Update(profile),
+        (http::Method::PUT, Err(_)) => Api::BadRequest,
+        (http::Method::DELETE, Ok(profile)) => Api::Delete(profile),
+        (http::Method::DELETE, Err(_)) => Api::NotFound,
         _ => Api::MethodNotAllowed,
     }
 }
