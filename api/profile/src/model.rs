@@ -5,9 +5,7 @@ use bytes::Bytes;
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 
-use spin_sdk::pg::{self as db, Decode, ParameterValue, Row};
-
-use crate::utils::{get_last_param_from_route, get_column_lookup};
+use spin_sdk::pg::{self as db, Decode, ParameterValue, Row, Column};
 
 fn as_param<'a>(value: &'a Option<String>) -> Option<ParameterValue<'a>> {
     match value {
@@ -21,6 +19,25 @@ fn as_nullable_param<'a>(value: &'a Option<String>) -> ParameterValue<'a> {
         Some(value) => value,
         None => ParameterValue::DbNull,
     }
+}
+
+fn get_column_lookup<'a>(columns: &'a Vec<Column>) -> HashMap<&'a str, usize> {
+    columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.name.as_str(), i))
+        .collect::<HashMap<&str, usize>>()
+}
+
+fn get_params_from_route(route: &str) -> Vec<String> {
+    route
+        .split('/')
+        .flat_map(|s| if s == "" { None } else { Some(s.to_string()) })
+        .collect::<Vec<String>>()
+}
+
+fn get_last_param_from_route(route: &str) -> Option<String> {
+    get_params_from_route(route).last().cloned()
 }
 
 #[derive(Serialize, Deserialize, Debug)]

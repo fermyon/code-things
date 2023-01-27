@@ -1,6 +1,5 @@
 mod model;
 mod config;
-mod utils;
 
 use anyhow::Result;
 use bytes::Bytes;
@@ -9,7 +8,6 @@ use spin_sdk::{
     http_component,
 };
 use config::Config;
-use utils::{bad_request,internal_server_error,method_not_allowed,not_found, ok, no_content};
 use model::Profile;
 
 enum Api {
@@ -85,4 +83,38 @@ fn handle_delete_by_handle(db_url: &str, model: Profile) -> Result<Response> {
         Ok(_) => no_content(),
         Err(_) => internal_server_error(String::from("Error while deleting profile"))
     }
+}
+
+fn internal_server_error(err: String) -> Result<Response> {
+    Ok(http::Response::builder()
+        .status(http::StatusCode::INTERNAL_SERVER_ERROR)
+        .header(http::header::CONTENT_TYPE, "text/plain")
+        .body(Some(err.into()))?)
+}
+
+fn ok(payload: String) -> Result<Response> {
+    Ok(http::Response::builder()
+        .status(http::StatusCode::OK)
+        .header(http::header::CONTENT_TYPE, "application/json")
+        .body(Some(payload.into()))?)
+}
+
+fn method_not_allowed() -> Result<Response> {
+    quick_response(http::StatusCode::METHOD_NOT_ALLOWED)
+}
+
+fn bad_request() -> Result<Response> {
+    quick_response(http::StatusCode::BAD_REQUEST)
+}
+
+fn not_found() -> Result<Response> {
+    quick_response(http::StatusCode::NOT_FOUND)
+}
+
+fn no_content() -> Result<Response> {
+    quick_response(http::StatusCode::NO_CONTENT)
+}
+
+fn quick_response(s: http::StatusCode) -> Result<Response> {
+    Ok(http::Response::builder().status(s).body(None)?)
 }
