@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result, Ok};
+use anyhow::{anyhow, Result, Ok, Context};
 use bytes::Bytes;
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
@@ -85,13 +85,15 @@ impl Profile {
                 None => ParameterValue::DbNull,
             }
         ];
-        db::execute(db_url, "INSERT INTO profiles (id, handle, avatar) VALUES ($1, $2, $3)", &params)?;
+        db::execute(db_url, "INSERT INTO profiles (id, handle, avatar) VALUES ($1, $2, $3)", &params)
+            .context("Executing insert statement failed")?;
         Ok(())
     }
 
     pub(crate) fn get_by_handle(handle: &str, db_url: &str) -> Result<Profile> {
         let params = vec![ParameterValue::Str(handle)];
-        let row_set = db::query(db_url, "SELECT id, handle, avatar from profiles WHERE handle = $1", &params)?;
+        let row_set = db::query(db_url, "SELECT id, handle, avatar from profiles WHERE handle = $1", &params)
+            .context("Query profile by handle statement failed")?;
 
         let columns = get_column_lookup(&row_set.columns);
 
@@ -109,14 +111,16 @@ impl Profile {
                     as_nullable_param(&self.avatar),
                     ParameterValue::Str(id.as_str()),
                 ];
-                db::execute(db_url, "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3", &params)?;
+                db::execute(db_url, "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3", &params)
+                    .context("Executing update by ID statement failed")?;
             },
             None => {
                 let params = vec![
                     as_nullable_param(&self.avatar),
                     ParameterValue::Str(self.handle.as_str())
                 ];
-                db::execute(db_url, "UPDATE profiles SET avatar=$1 WHERE handle=$2", &params)?;
+                db::execute(db_url, "UPDATE profiles SET avatar=$1 WHERE handle=$2", &params)
+                    .context("Executing update by handle statement failed")?;
             }
         }
         Ok(())
@@ -128,13 +132,15 @@ impl Profile {
                 let params = vec![
                     ParameterValue::Str(id.as_str())
                 ];
-                db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)?;
+                db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)
+                    .context("Executing delete by id statement failed")?;
             },
             None => {
                 let params = vec![
                     ParameterValue::Str(self.handle.as_str())
                 ];
-                db::execute(db_url, "DELETE FROM profiles WHERE handle=$1", &params)?;
+                db::execute(db_url, "DELETE FROM profiles WHERE handle=$1", &params)
+                    .context("Executing delete by handle statement failed")?;
             }
         }
         Ok(())
