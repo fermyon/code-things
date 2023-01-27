@@ -24,7 +24,7 @@ enum Api {
 
 #[http_component]
 fn profile_api(req: Request) -> Result<Response> {
-    let cfg = Config::get();
+    let cfg = Config::default();
 
     match api_from_request(req) {
         Api::BadRequest => bad_request(),

@@ -7,10 +7,10 @@ pub(crate) struct Config {
     pub db_url: String,
 }
 
-impl Config {
-    pub(crate) fn get() -> Config {
-        Config {
-            db_url: get(KEY_DB_URL).unwrap(),
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            db_url: get(KEY_DB_URL).expect("Missing config item 'db_url'"),
         }
     }
 }
