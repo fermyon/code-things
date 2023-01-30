@@ -1,0 +1,23 @@
+spin_version = "1"
+authors = ["Justin Pflueger <justin.pflueger@fermyon.com>"]
+description = "Social media app for code snippets"
+name = "code-things"
+trigger = { type = "http", base = "/" }
+version = "0.1.0"
+
+[variables]
+db_user = { default = "code-things" }
+db_pswd = { default = "password" }
+db_host = { default = "127.0.0.1" }
+db_name = { default = "code_things" }
+
+[[component]]
+id = "profile-api"
+source = "api/profile/target/wasm32-wasi/release/profile_api.wasm"
+[component.trigger]
+route = "/api/profile/..."
+[component.build]
+command = "cargo build --target wasm32-wasi --release"
+workdir = "api/profile"
+[component.config]
+db_url = "host={{db_host}} user={{db_user}} password={{db_pswd}} dbname={{db_name}}"
