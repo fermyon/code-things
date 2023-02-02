@@ -1,28 +1,35 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { RouterView } from "vue-router";
+import { useAuth0 } from "@auth0/auth0-vue";
 
 import { NavBar, NavLink } from "@/components/nav";
 import DropdownMenu from "@/components/DropdownMenu.vue";
-import UserProfileImage from "@/components/Avatar.vue";
+import UserProfileImage from "@/components/UserProfileImage.vue";
 
-const isAuthenticated = ref(false);
+const {
+  isAuthenticated,
+  loginWithRedirect,
+  logout,
+} = useAuth0();
+
+function loginHandler() {
+  loginWithRedirect({
+    appState: {
+      target: "/",
+    },
+  });
+}
+
+function logoutHandler() {
+  logout();
+}
 
 const userNavItems = computed(() =>
   isAuthenticated.value
     ? [{ text: "Profile", route: "/profile" }, { text: "Log Out", click: logoutHandler }]
     : [{ text: "Log In", click: loginHandler }]
 );
-
-
-function loginHandler() {
-  isAuthenticated.value = true;
-}
-
-function logoutHandler() {
-  isAuthenticated.value = false;
-}
-
 </script>
 
 <template>

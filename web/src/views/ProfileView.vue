@@ -1,34 +1,33 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useAuth0 } from "@auth0/auth0-vue";
+const { user, getAccessTokenSilently } = useAuth0();
 
-const id = ref("");
-const handle = ref("");
-const avatar = ref("");
+const handle = ref(user.value.nickname);
+const avatar = ref(user.value.picture);
 
 async function submit() {
   try {
-    let profile = {
-      id: id.value,
+    const accessToken = await getAccessTokenSilently();
+    const profile = {
       handle: handle.value,
       avatar: avatar.value,
     };
-    let response: Response;
-    if (profile.id?.length > 0) {
-      // update
-      response = await fetch(`/api/profile/${profile.handle}`, {
-        method: "POST",
-        body: JSON.stringify(profile),
-      });
+    const response = await fetch("/api/profile", {
+      method: "POST",
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(profile),
+    });
+    if (response.ok) {
+      const updatedProfile = await response.json();
+      handle.value = updatedProfile.handle;
+      avatar.value = updatedProfile.avatar;
     } else {
-      // create
-      response = await fetch("/api/profile", {
-        method: "PUT",
-        body: JSON.stringify(profile),
-      });
+      const message = await response.text();
+      console.error(`Profile API Error: ${response.statusText} ${message}`);
     }
-
-    const responseText = await response.text();
-    console.log(responseText);
   } catch (ex) {
     console.log(ex);
   }
@@ -64,7 +63,7 @@ async function submit() {
                       type="text"
                       name="handle"
                       id="handle"
-                      autocomplete="username"
+                      autocomplete="handle"
                       class="focus:border-indigo-500 focus:ring-indigo-500 mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
                     />
                   </div>
@@ -84,7 +83,7 @@ async function submit() {
                         type="text"
                         name="avatar"
                         id="avatar"
-                        autocomplete="url"
+                        autocomplete="email"
                         class="focus:border-indigo-500 focus:ring-indigo-500 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
                       />
                     </div>

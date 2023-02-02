@@ -36,6 +36,13 @@ fn profile_api(req: Request) -> Result<Response> {
 }
 
 fn api_from_request(req: &Request) -> Api {
+    let auth_header = req
+        .headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|x| x.to_str().ok())
+        .unwrap_or("None");
+    println!("AUTHORIZATION: {auth_header:?}");
+
     let method = req.method().to_owned();
     let profile = match method {
         http::Method::GET | http::Method::DELETE => Profile::from_path(&req.headers()),
