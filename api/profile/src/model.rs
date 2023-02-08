@@ -67,6 +67,11 @@ impl Profile {
         Ok(serde_json::from_slice(&b)?)
     }
 
+    pub(crate) fn with_id(mut self, id: Option<String>) -> Self {
+        self.id = id;
+        self
+    }
+
     fn from_row(row: &Row, columns: &HashMap<&str, usize>) -> Result<Self> {
         let id = String::decode(&row[columns["id"]]).ok();
         let handle = String::decode(&row[columns["handle"]])?;
@@ -92,67 +97,42 @@ impl Profile {
         Ok(())
     }
 
-    pub(crate) fn get_by_handle(handle: &str, db_url: &str) -> Result<Profile> {
-        let params = vec![ParameterValue::Str(handle)];
+    pub(crate) fn get_by_id(id: &str, db_url: &str) -> Result<Profile> {
+        let params = vec![ParameterValue::Str(id)];
         let row_set = db::query(
             db_url,
-            "SELECT id, handle, avatar from profiles WHERE handle = $1",
+            "SELECT id, handle, avatar from profiles WHERE id = $1",
             &params,
         )
-        .context("Query profile by handle statement failed")?;
+        .context("Query profile by id statement failed")?;
 
         let columns = get_column_lookup(&row_set.columns);
 
         match row_set.rows.first() {
             Some(row) => Profile::from_row(row, &columns),
-            None => Err(anyhow!("Profile not found for handle '{:?}'", handle)),
+            None => Err(anyhow!("Profile not found for id '{:?}'", id)),
         }
     }
 
     pub(crate) fn update(&self, db_url: &str) -> Result<()> {
-        match &self.id {
-            Some(id) => {
-                let params = vec![
-                    ParameterValue::Str(&self.handle),
-                    as_nullable_param(&self.avatar),
-                    ParameterValue::Str(id.as_str()),
-                ];
-                db::execute(
-                    db_url,
-                    "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3",
-                    &params,
-                )
-                .context("Executing update by ID statement failed")?;
-            }
-            None => {
-                let params = vec![
-                    as_nullable_param(&self.avatar),
-                    ParameterValue::Str(self.handle.as_str()),
-                ];
-                db::execute(
-                    db_url,
-                    "UPDATE profiles SET avatar=$1 WHERE handle=$2",
-                    &params,
-                )
-                .context("Executing update by handle statement failed")?;
-            }
-        }
+        let params = vec![
+            ParameterValue::Str(&self.handle),
+            as_nullable_param(&self.avatar),
+            as_param(&self.id).ok_or(anyhow!("The id field is currently required for update"))?,
+        ];
+        db::execute(
+            db_url,
+            "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3",
+            &params,
+        )
+        .context("Executing update by ID statement failed")?;
         Ok(())
     }
 
-    pub(crate) fn delete(&self, db_url: &str) -> Result<()> {
-        match &self.id {
-            Some(id) => {
-                let params = vec![ParameterValue::Str(id.as_str())];
-                db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)
-                    .context("Executing delete by id statement failed")?;
-            }
-            None => {
-                let params = vec![ParameterValue::Str(self.handle.as_str())];
-                db::execute(db_url, "DELETE FROM profiles WHERE handle=$1", &params)
-                    .context("Executing delete by handle statement failed")?;
-            }
-        }
+    pub(crate) fn delete_by_id(id: &str, db_url: &str) -> Result<()> {
+        let params = vec![ParameterValue::Str(id)];
+        db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)
+            .context("Executing delete by id statement failed")?;
         Ok(())
     }
 }

@@ -10,6 +10,9 @@ db_user = { default = "code-things" }
 db_pswd = { default = "password" }
 db_host = { default = "127.0.0.1" }
 db_name = { default = "code_things" }
+auth_domain = { default = "dev-czhnnl8ikcojc040.us.auth0.com" }
+auth_audience = { default = "https://code-things.fermyon.app/api" }
+auth_max_validity_secs = { default = "86400" }
 
 [[component]]
 id = "web"
@@ -27,6 +30,7 @@ workdir = "web"
 [[component]]
 id = "profile-api"
 source = "api/profile/target/wasm32-wasi/release/profile_api.wasm"
+allowed_http_hosts = [ "dev-czhnnl8ikcojc040.us.auth0.com" ]
 [component.trigger]
 route = "/api/profile/..."
 [component.build]
@@ -34,3 +38,6 @@ command = "cargo build --target wasm32-wasi --release"
 workdir = "api/profile"
 [component.config]
 db_url = "host={{db_host}} user={{db_user}} password={{db_pswd}} dbname={{db_name}}"
+auth_domain = "{{ auth_domain }}"
+auth_audience = "{{ auth_audience }}"
+auth_max_validity_secs = "{{ auth_max_validity_secs }}"
