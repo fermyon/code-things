@@ -1,0 +1,9 @@
+@tailwind base;
+@layer base {
+    html {
+        font-family: Sen, Europa, Avenir, system, -apple-system, ".SFNSText-Regular", San Francisco, Segoe UI, Helvetica Neue, Lucida Grande, sans-serif;
+    }
+}
+
+@tailwind components;
+@tailwind utilities;
