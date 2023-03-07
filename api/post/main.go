@@ -2,10 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/fermyon/spin/sdk/go/config"
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
+	"github.com/fermyon/spin/sdk/go/postgres"
 	"github.com/go-chi/chi/v5"
+	"github.com/valyala/fastjson"
 )
 
 func init() {
@@ -13,22 +19,11 @@ func init() {
 		// we need to setup the router in the spin handler
 		r := chi.NewRouter()
 
-		// r.Use(middleware.RequestID)
-		// r.Use(middleware.Logger)
-		// r.Use(middleware.Recoverer)
-
-		// fmt.Println("Headers: ")
-		// for k, v := range req.Header {
-		// 	fmt.Printf("\t%s=%s\n", k, v)
-		// }
-		// fmt.Println("---")
-
 		// mount a sub-router for posts to the appropriate component path
 		// otherwise we would need to concat the prefix to all of the
 		// routes which seems messier
 		routePrefix := req.Header.Get("Spin-Component-Route")
 		r.Mount(routePrefix, Posts())
-
 		r.ServeHTTP(w, req)
 	})
 }
@@ -51,22 +46,92 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 }
 
 func createPost(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Create Post not yet implemented")
+	fmt.Println("Create Post Handler invoked")
+
+	// parse the post
+	post, err := parsePostJson(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// insert into the database
+	err = post.dbInsert()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// write the post to the response as json
+	_, err = io.WriteString(w, post.toJson())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// success, write status and headers
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
 }
 
 func readPost(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Read Post not yet implemented")
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error converting id to integer: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	post, err := dbReadById(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// write the post to the response as json
+	_, err = io.WriteString(w, post.toJson())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// success, write status and headers
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
 }
 
 func listPosts(w http.ResponseWriter, r *http.Request) {
-	// var posts = []*Post{
-	// 	{ID: "1", UserID: 100},
-	// 	{ID: "2", UserID: 200},
-	// 	{ID: "3", UserID: 300},
-	// 	{ID: "4", UserID: 400},
-	// 	{ID: "5", UserID: 500},
-	// }
-	fmt.Fprintln(w, "List Posts not yet implemented")
+	posts, err := dbReadAll()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// until we can find a library that serializes, we need to manually build the json array
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := 0; i < len(posts); i++ {
+		json := posts[i].toJson()
+		sb.WriteString(json)
+		if i != len(posts)-1 {
+			sb.WriteString(",")
+		}
+	}
+	sb.WriteString("]")
+
+	_, err = io.WriteString(w, sb.String())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
 }
 
 func updatePost(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +146,122 @@ func deletePost(w http.ResponseWriter, r *http.Request) {
 Response Rendering
 */
 type Post struct {
-	ID     string `json:"id"`
-	UserID int64  `json:"user_id"`
+	ID       int    `json:"id"`
+	AuthorID string `json:"author_id"`
+	Content  string `json:"content"`
+	Type     string `json:"type"`
+	Data     string `json:"data"`
+}
+
+func parsePostJson(r io.ReadCloser) (Post, error) {
+	var post Post
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return post, fmt.Errorf("Error reading the request: %v", err)
+	}
+
+	var p fastjson.Parser
+	if val, err := p.ParseBytes(b); err != nil {
+		return post, fmt.Errorf("Error parsing json: %v", err)
+	} else {
+		post.AuthorID = string(val.GetStringBytes("author_id"))
+		post.Content = string(val.GetStringBytes("content"))
+		post.Type = string(val.GetStringBytes("type"))
+		post.Data = string(val.GetStringBytes("data"))
+		return post, nil
+	}
+}
+
+func (post *Post) toJson() string {
+	return fmt.Sprintf(`{
+		"id": %v,
+		"author_id": "%v",
+		"content": "%v",
+		"type": "%v",
+		"data": "%v"
+	}`,
+		post.ID,
+		post.AuthorID,
+		post.Content,
+		post.Type,
+		post.Data)
+}
+
+func fromRow(row []postgres.DbValue) Post {
+	var post Post
+	post.ID = int(row[0].GetInt32())
+	post.AuthorID = row[1].GetStr()
+	post.Content = row[2].GetStr()
+	post.Type = row[3].GetStr()
+	post.Data = row[4].GetStr()
+	return post
+}
+
+func dbReadById(id int) (Post, error) {
+	db_url, err := config.Get("db_url")
+	if err != nil {
+		return Post{}, fmt.Errorf("Error reading db_url from config: %s", err.Error())
+	}
+
+	statement := "SELECT id, author_id, content, type, data FROM posts WHERE id=$1"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueInt32(int32(id)),
+	}
+	rowset, err := postgres.Query(db_url, statement, params)
+	if err != nil {
+		return Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
+	}
+
+	post := fromRow(rowset.Rows[0])
+	return post, nil
+}
+
+func dbReadAll() ([]Post, error) {
+	db_url, err := config.Get("db_url")
+	if err != nil {
+		return []Post{}, fmt.Errorf("Error reading db_url from config: %s", err.Error())
+	}
+
+	statement := "SELECT id, author_id, content, type, data FROM posts"
+	rowset, err := postgres.Query(db_url, statement, []postgres.ParameterValue{})
+	if err != nil {
+		return []Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
+	}
+
+	n := len(rowset.Rows)
+	posts := make([]Post, n)
+	for i := 0; i < n; i++ {
+		row := rowset.Rows[i]
+		posts[i] = fromRow(row)
+	}
+
+	return posts, nil
+}
+
+func (post *Post) dbInsert() error {
+	db_url, err := config.Get("db_url")
+	if err != nil {
+		return fmt.Errorf("Error reading db_url from config: %s", err.Error())
+	}
+
+	statement := "INSERT INTO posts (author_id, content, type, data) VALUES ($1, $2, $3, $4)"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueStr(post.AuthorID),
+		postgres.ParameterValueStr(post.Content),
+		postgres.ParameterValueStr(post.Type),
+		postgres.ParameterValueStr(post.Content),
+	}
+	_, err = postgres.Execute(db_url, statement, params)
+	if err != nil {
+		return fmt.Errorf("Error inserting into database: %s", err.Error())
+	}
+
+	// this is a gross hack that will surely bite me later
+	rowset, err := postgres.Query(db_url, "SELECT lastval()", []postgres.ParameterValue{})
+	if err != nil {
+		return fmt.Errorf("Error querying id from database: %s", err.Error())
+	}
+	post.ID = int(rowset.Rows[0][0].GetInt32())
+
+	return nil
 }
