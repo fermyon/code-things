@@ -12,6 +12,7 @@ import (
 	"github.com/fermyon/spin/sdk/go/postgres"
 	"github.com/go-chi/chi/v5"
 	"github.com/valyala/fastjson"
+	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -42,15 +43,18 @@ func Posts() chi.Router {
 	return r
 }
 
-func notFound(w http.ResponseWriter, r *http.Request) {
-}
-
 func createPost(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Create Post Handler invoked")
 
 	// parse the post
 	post, err := parsePostJson(r.Body)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// validate the input
+	if err = post.validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -146,11 +150,45 @@ func deletePost(w http.ResponseWriter, r *http.Request) {
 Response Rendering
 */
 type Post struct {
-	ID       int    `json:"id"`
-	AuthorID string `json:"author_id"`
-	Content  string `json:"content"`
-	Type     string `json:"type"`
-	Data     string `json:"data"`
+	ID         int    `json:"id"`
+	AuthorID   string `json:"author_id"`
+	Content    string `json:"content"`
+	Type       string `json:"type"`
+	Data       string `json:"data"`
+	Visibility string `json:"visibility"`
+}
+
+var postTypes = []string{
+	"permalink-range",
+	"code",
+}
+var postVisibilities = []string{
+	"public",
+}
+
+func (post *Post) validate() error {
+	var errs []string
+	if post.AuthorID == "" {
+		errs = append(errs, "'author_id' is required")
+	}
+	if post.Content == "" {
+		errs = append(errs, "'content' is required")
+	}
+	if !slices.Contains(postTypes, post.Type) {
+		errs = append(errs, fmt.Sprintf("'type' must be one of [%v]", postTypes))
+	}
+	if post.Data == "" {
+		errs = append(errs, "'data' is required")
+	}
+	if !slices.Contains(postVisibilities, post.Visibility) {
+		errs = append(errs, fmt.Sprintf("'visibility' must be one of [%v]", postTypes))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("Request failed validation:\n%s", strings.Join(errs, "\n"))
+	} else {
+		return nil
+	}
 }
 
 func parsePostJson(r io.ReadCloser) (Post, error) {
@@ -168,6 +206,7 @@ func parsePostJson(r io.ReadCloser) (Post, error) {
 		post.Content = string(val.GetStringBytes("content"))
 		post.Type = string(val.GetStringBytes("type"))
 		post.Data = string(val.GetStringBytes("data"))
+		post.Visibility = string(val.GetStringBytes("visibility"))
 		return post, nil
 	}
 }
@@ -178,13 +217,14 @@ func (post *Post) toJson() string {
 		"author_id": "%v",
 		"content": "%v",
 		"type": "%v",
-		"data": "%v"
-	}`,
+		"data": "%v",
+		"visibility": "%v"}`,
 		post.ID,
 		post.AuthorID,
 		post.Content,
 		post.Type,
-		post.Data)
+		post.Data,
+		post.Visibility)
 }
 
 func fromRow(row []postgres.DbValue) Post {
@@ -194,6 +234,7 @@ func fromRow(row []postgres.DbValue) Post {
 	post.Content = row[2].GetStr()
 	post.Type = row[3].GetStr()
 	post.Data = row[4].GetStr()
+	post.Visibility = row[5].GetStr()
 	return post
 }
 
@@ -203,7 +244,7 @@ func dbReadById(id int) (Post, error) {
 		return Post{}, fmt.Errorf("Error reading db_url from config: %s", err.Error())
 	}
 
-	statement := "SELECT id, author_id, content, type, data FROM posts WHERE id=$1"
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE id=$1"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt32(int32(id)),
 	}
@@ -222,7 +263,7 @@ func dbReadAll() ([]Post, error) {
 		return []Post{}, fmt.Errorf("Error reading db_url from config: %s", err.Error())
 	}
 
-	statement := "SELECT id, author_id, content, type, data FROM posts"
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts"
 	rowset, err := postgres.Query(db_url, statement, []postgres.ParameterValue{})
 	if err != nil {
 		return []Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
@@ -244,12 +285,13 @@ func (post *Post) dbInsert() error {
 		return fmt.Errorf("Error reading db_url from config: %s", err.Error())
 	}
 
-	statement := "INSERT INTO posts (author_id, content, type, data) VALUES ($1, $2, $3, $4)"
+	statement := "INSERT INTO posts (author_id, content, type, data, visibility) VALUES ($1, $2, $3, $4, $5)"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueStr(post.AuthorID),
 		postgres.ParameterValueStr(post.Content),
 		postgres.ParameterValueStr(post.Type),
 		postgres.ParameterValueStr(post.Content),
+		postgres.ParameterValueStr(post.Visibility),
 	}
 	_, err = postgres.Execute(db_url, statement, params)
 	if err != nil {
@@ -261,7 +303,7 @@ func (post *Post) dbInsert() error {
 	if err != nil {
 		return fmt.Errorf("Error querying id from database: %s", err.Error())
 	}
-	post.ID = int(rowset.Rows[0][0].GetInt32())
+	post.ID = int(rowset.Rows[0][0].GetInt64())
 
 	return nil
 }

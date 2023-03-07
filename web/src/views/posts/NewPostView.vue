@@ -12,6 +12,7 @@ const postType = ref("permalink-range");
 const permalink = ref("");
 const permalinkPreview = ref("");
 const content = ref("");
+const visibility = ref("public");
 
 // function to get the permalink
 const getPermalinkPreview = async () => {
@@ -67,6 +68,7 @@ async function submit() {
     content: content.value,
     type: postType.value,
     data: permalink.value,
+    visibility: visibility.value,
   };
   const response = await fetch("/api/post", {
     method: "POST",
