@@ -1,0 +1,4 @@
+github.com/fermyon/spin/sdk/go v0.9.0 h1:NbenEz5GVQfH/SmitI/VWrHwXyDYnihJbo59Z/8xjps=
+github.com/fermyon/spin/sdk/go v0.9.0/go.mod h1:ARV2oVtnUCykLM+xCBZq8MQrCZddzb3JbeBettYv1S0=
+github.com/go-chi/chi/v5 v5.0.8 h1:lD+NLqFcAi1ovnVZpsnObHGW4xb4J8lNmoYVfECH1Y0=
+github.com/go-chi/chi/v5 v5.0.8/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
