@@ -78,52 +78,92 @@ func getPostId(r *http.Request) (int, error) {
 func createPost(res http.ResponseWriter, req *http.Request) {
 	post := req.Context().Value(postCtxKey{}).(Post)
 
-	//TODO: actually write the post to the database
-
-	post.RenderJsonResponse(res)
+	err := DbInsert(&post)
+	if err == nil {
+		renderJsonResponse(res, post.ToJson())
+		res.Header().Add("location", fmt.Sprintf("/api/post/%v", post.ID))
+		res.WriteHeader(http.StatusCreated)
+	} else {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func listPosts(res http.ResponseWriter, req *http.Request) {
-	http.Error(res, "List posts not yet implemented", http.StatusNotImplemented)
+	if posts, err := DbReadAll(); err == nil {
+		renderJsonResponse(res, ToJson(posts))
+	} else {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func readPost(res http.ResponseWriter, req *http.Request) {
-	var post Post
-
-	if id, err := getPostId(req); err != nil {
+	id, err := getPostId(req)
+	if err != nil {
 		msg := fmt.Sprintf("Failed to parse URL param 'id': %v", id)
 		renderBadRequestResponse(res, msg)
 		return
-	} else {
-		// TODO: actually get the post from the database
-		post = Post{
-			ID: id,
-		}
 	}
 
-	post.RenderJsonResponse(res)
+	post, err := DbReadById(id)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if (post == Post{}) {
+		http.Error(res, "Not found", http.StatusNotFound)
+		return
+	}
+	renderJsonResponse(res, post.ToJson())
 }
 
 func updatePost(res http.ResponseWriter, req *http.Request) {
 	post := req.Context().Value(postCtxKey{}).(Post)
 
-	post.RenderJsonResponse(res)
-}
-
-func deletePost(res http.ResponseWriter, req *http.Request) {
-	var post Post
-
 	if id, err := getPostId(req); err != nil {
 		msg := fmt.Sprintf("Failed to parse URL param 'id': %v", id)
 		renderBadRequestResponse(res, msg)
 		return
 	} else {
-		// TODO: actually delete the post from the database
-		fmt.Printf("TODO: implement delete for id=%v", id)
+		post.ID = id
 	}
 
-	post.RenderJsonResponse(res)
+	if err := DbUpdate(post); err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	}
+	renderJsonResponse(res, post.ToJson())
 }
+
+func deletePost(res http.ResponseWriter, req *http.Request) {
+	id, err := getPostId(req)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to parse URL param 'id': %v", id)
+		renderBadRequestResponse(res, msg)
+		return
+	}
+
+	if err := DbDelete(id); err == nil {
+		res.WriteHeader(http.StatusNoContent)
+	} else {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func renderJsonResponse(res http.ResponseWriter, json string) {
+	// write the post to the response as json
+	if _, err := io.WriteString(res, json); err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	} else {
+		res.WriteHeader(http.StatusOK)
+		res.Header().Add("Content-Type", "application/json")
+	}
+}
+
+func renderBadRequestResponse(res http.ResponseWriter, msg string) {
+	fmt.Print(msg)
+	http.Error(res, msg, http.StatusBadRequest)
+}
+
+// Post model
 
 type Post struct {
 	ID         int    // auto-incremented by postgres
@@ -211,19 +251,45 @@ func (post *Post) ToJson() string {
 		post.Visibility)
 }
 
-func (post *Post) RenderJsonResponse(res http.ResponseWriter) {
-	json := post.ToJson()
-
-	// write the post to the response as json
-	if _, err := io.WriteString(res, json); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-	} else {
-		res.WriteHeader(http.StatusOK)
-		res.Header().Add("Content-Type", "application/json")
+func ToJson(posts []Post) string {
+	var sb strings.Builder
+	sb.WriteRune('[')
+	for i := 0; i < len(posts); i++ {
+		sb.WriteString(posts[i].ToJson())
+		if i != len(posts)-1 {
+			sb.WriteRune(',')
+		}
 	}
+	sb.WriteRune(']')
+	return sb.String()
 }
 
-func renderBadRequestResponse(res http.ResponseWriter, msg string) {
-	fmt.Print(msg)
-	http.Error(res, msg, http.StatusBadRequest)
+// Database Operations
+
+func DbInsert(post *Post) error {
+	//TODO: implement
+	post.ID = 1
+	return nil
+}
+
+func DbReadAll() ([]Post, error) {
+	//TODO: implement
+	return []Post{}, nil
+}
+
+func DbReadById(id int) (Post, error) {
+	//TODO: implement
+	return Post{
+		ID: id,
+	}, nil
+}
+
+func DbUpdate(post Post) error {
+	//TODO: implement
+	return nil
+}
+
+func DbDelete(id int) error {
+	//TODO: implement
+	return nil
 }
