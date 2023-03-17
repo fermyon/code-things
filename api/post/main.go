@@ -300,6 +300,25 @@ func DbInsert(post *Post) error {
 	return nil
 }
 
+func DbReadById(id int) (Post, error) {
+	db_url := getDbUrl()
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE id=$1"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueInt32(int32(id)),
+	}
+
+	rowset, err := postgres.Query(db_url, statement, params)
+	if err != nil {
+		return Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
+	}
+
+	if rowset.Rows == nil || len(rowset.Rows) == 0 {
+		return Post{}, nil
+	} else {
+		return fromRow(rowset.Rows[0])
+	}
+}
+
 func DbReadAll() ([]Post, error) {
 	//TODO: implement
 	return []Post{}, nil
@@ -330,4 +349,53 @@ func getDbUrl() string {
 		panic(fmt.Sprintf("Unable to retrieve 'db_url' config item: %v", err))
 	}
 	return db_url
+}
+
+func assertValueKind(row []postgres.DbValue, col int, expected postgres.DbValueKind) (postgres.DbValue, error) {
+	if row[col].Kind() != expected {
+		return postgres.DbValue{}, fmt.Errorf("Expected column %v to be %v kind but got %v\n", col, expected, row[col].Kind())
+	}
+	return row[col], nil
+}
+
+func fromRow(row []postgres.DbValue) (Post, error) {
+	var post Post
+
+	if val, err := assertValueKind(row, 0, postgres.DbValueKindInt32); err == nil {
+		post.ID = int(val.GetInt32())
+	} else {
+		return post, err
+	}
+
+	if val, err := assertValueKind(row, 1, postgres.DbValueKindStr); err == nil {
+		post.AuthorID = val.GetStr()
+	} else {
+		return post, err
+	}
+
+	if val, err := assertValueKind(row, 2, postgres.DbValueKindStr); err == nil {
+		post.Content = val.GetStr()
+	} else {
+		return post, err
+	}
+
+	if val, err := assertValueKind(row, 3, postgres.DbValueKindStr); err == nil {
+		post.Type = val.GetStr()
+	} else {
+		return post, err
+	}
+
+	if val, err := assertValueKind(row, 4, postgres.DbValueKindStr); err == nil {
+		post.Data = val.GetStr()
+	} else {
+		return post, err
+	}
+
+	if val, err := assertValueKind(row, 5, postgres.DbValueKindStr); err == nil {
+		post.Visibility = val.GetStr()
+	} else {
+		return post, err
+	}
+
+	return post, nil
 }
