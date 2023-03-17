@@ -91,7 +91,9 @@ func createPost(res http.ResponseWriter, req *http.Request) {
 }
 
 func listPosts(res http.ResponseWriter, req *http.Request) {
-	if posts, err := DbReadAll(); err == nil {
+	limit, offset := getPaginationParams(req)
+
+	if posts, err := DbReadAll(limit, offset); err == nil {
 		renderJsonResponse(res, ToJson(posts))
 	} else {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
@@ -163,6 +165,44 @@ func renderJsonResponse(res http.ResponseWriter, json string) {
 func renderBadRequestResponse(res http.ResponseWriter, msg string) {
 	fmt.Print(msg)
 	http.Error(res, msg, http.StatusBadRequest)
+}
+
+func getPaginationParams(req *http.Request) (limit int, offset int) {
+	// helper function to clamp the value
+	clamp := func(val int, min int, max int) int {
+		if val < min {
+			return min
+		} else if val > max {
+			return max
+		} else {
+			return val
+		}
+	}
+
+	// get the limit from the URL
+	limit_param := chi.URLParam(req, "limit")
+	if limit_val, err := strconv.Atoi(limit_param); err != nil {
+		// error occurred, just use a default value
+		fmt.Printf("Failed to parse the limit from URL: %v", err)
+		limit = 5
+	} else {
+		// clamp the value in case of invalid parameters (intentional or otherwise)
+		limit = clamp(limit_val, 0, 25)
+	}
+
+	// get the offset from the URL
+	offset_param := chi.URLParam(req, "offset")
+	if offset_val, err := strconv.Atoi(offset_param); err != nil {
+		// error occurred, just use a default value
+		fmt.Printf("Failed to parse the offset from URL: %v", err)
+		offset = 0
+	} else {
+		// clamp the value in case of invalid parameters (intentional or otherwise)
+		// limiting this one to 10,000 because I find it unlikely that anyone will post 10k times :)
+		offset = clamp(offset_val, 0, 10000)
+	}
+
+	return limit, offset
 }
 
 // Post model
@@ -319,10 +359,14 @@ func DbReadById(id int) (Post, error) {
 	}
 }
 
-func DbReadAll() ([]Post, error) {
+func DbReadAll(limit int, offset int) ([]Post, error) {
 	db_url := getDbUrl()
-	statement := "SELECT id, author_id, content, type, data, visibility FROM posts"
-	rowset, err := postgres.Query(db_url, statement, []postgres.ParameterValue{})
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts ORDER BY id LIMIT $1 OFFSET $2"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueInt64(int64(limit)),
+		postgres.ParameterValueInt64(int64(offset)),
+	}
+	rowset, err := postgres.Query(db_url, statement, params)
 	if err != nil {
 		return []Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
 	}
