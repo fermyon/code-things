@@ -320,15 +320,23 @@ func DbReadById(id int) (Post, error) {
 }
 
 func DbReadAll() ([]Post, error) {
-	//TODO: implement
-	return []Post{}, nil
-}
+	db_url := getDbUrl()
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts"
+	rowset, err := postgres.Query(db_url, statement, []postgres.ParameterValue{})
+	if err != nil {
+		return []Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
+	}
 
-func DbReadById(id int) (Post, error) {
-	//TODO: implement
-	return Post{
-		ID: id,
-	}, nil
+	posts := make([]Post, len(rowset.Rows))
+	for i, row := range rowset.Rows {
+		if post, err := fromRow(row); err != nil {
+			return []Post{}, err
+		} else {
+			posts[i] = post
+		}
+	}
+
+	return posts, nil
 }
 
 func DbUpdate(post Post) error {
