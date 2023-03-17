@@ -51,3 +51,5 @@ route = "/api/post/..."
 [component.build]
 command = "tinygo build -target=wasi -gc=leaking -no-debug -o main.wasm main.go"
 workdir = "./api/post"
+[component.config]
+db_url = "host={{db_host}} user={{db_user}} password={{db_pswd}} dbname={{db_name}}"

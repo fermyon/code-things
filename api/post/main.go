@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fermyon/spin/sdk/go/config"
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
+	"github.com/fermyon/spin/sdk/go/postgres"
 	"github.com/go-chi/chi/v5"
 	"github.com/valyala/fastjson"
 	"golang.org/x/exp/slices"
@@ -267,8 +269,34 @@ func ToJson(posts []Post) string {
 // Database Operations
 
 func DbInsert(post *Post) error {
-	//TODO: implement
-	post.ID = 1
+	db_url := getDbUrl()
+	statement := "INSERT INTO posts (author_id, content, type, data, visibility) VALUES ($1, $2, $3, $4, $5)"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueStr(post.AuthorID),
+		postgres.ParameterValueStr(post.Content),
+		postgres.ParameterValueStr(post.Type),
+		postgres.ParameterValueStr(post.Data),
+		postgres.ParameterValueStr(post.Visibility),
+	}
+
+	_, err := postgres.Execute(db_url, statement, params)
+	if err != nil {
+		return fmt.Errorf("Error inserting into database: %s", err.Error())
+	}
+
+	// this is a gross hack that will surely bite me later
+	rowset, err := postgres.Query(db_url, "SELECT lastval()", []postgres.ParameterValue{})
+	if err != nil || len(rowset.Rows) != 1 || len(rowset.Rows[0]) != 1 {
+		return fmt.Errorf("Error querying id from database: %s", err.Error())
+	}
+
+	id_val := rowset.Rows[0][0]
+	if id_val.Kind() == postgres.DbValueKindInt64 {
+		post.ID = int(id_val.GetInt64())
+	} else {
+		fmt.Printf("Failed to populate created post's identifier, invalid kind returned from database: %v", id_val.Kind())
+	}
+
 	return nil
 }
 
@@ -292,4 +320,14 @@ func DbUpdate(post Post) error {
 func DbDelete(id int) error {
 	//TODO: implement
 	return nil
+}
+
+// Database Helper Functions
+
+func getDbUrl() string {
+	db_url, err := config.Get("db_url")
+	if err != nil {
+		panic(fmt.Sprintf("Unable to retrieve 'db_url' config item: %v", err))
+	}
+	return db_url
 }
