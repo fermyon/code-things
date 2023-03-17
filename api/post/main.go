@@ -340,13 +340,34 @@ func DbReadAll() ([]Post, error) {
 }
 
 func DbUpdate(post Post) error {
-	//TODO: implement
+	db_url := getDbUrl()
+	statement := "UPDATE posts SET author_id=$1, content=$2, type=$3, data=$4, visibility=$5 WHERE id=$6"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueStr(post.AuthorID),
+		postgres.ParameterValueStr(post.Content),
+		postgres.ParameterValueStr(post.Type),
+		postgres.ParameterValueStr(post.Data),
+		postgres.ParameterValueStr(post.Visibility),
+		postgres.ParameterValueInt32(int32(post.ID)),
+	}
+
+	_, err := postgres.Execute(db_url, statement, params)
+	if err != nil {
+		return fmt.Errorf("Error updating database: %s", err.Error())
+	}
+
 	return nil
 }
 
 func DbDelete(id int) error {
-	//TODO: implement
-	return nil
+	db_url := getDbUrl()
+	statement := "DELETE FROM posts WHERE id=$1"
+	params := []postgres.ParameterValue{
+		postgres.ParameterValueInt32(int32(id)),
+	}
+
+	_, err := postgres.Execute(db_url, statement, params)
+	return err
 }
 
 // Database Helper Functions
