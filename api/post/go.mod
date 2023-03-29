@@ -9,6 +9,4 @@ require (
 	github.com/fermyon/spin/sdk/go v1.0.0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/golang-jwt/jwt/v4 v4.5.0
-	github.com/valyala/fastjson v1.6.4
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )

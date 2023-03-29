@@ -27,6 +27,7 @@ func init() {
 	})
 }
 
+// TODO: create wrapper function to handle errors?
 func PostRouter() chi.Router {
 	posts := chi.NewRouter()
 	idParamPattern := fmt.Sprintf("/{%v:[0-9]+}", postIdCtxKey)
@@ -44,27 +45,27 @@ func createPost(res http.ResponseWriter, req *http.Request) {
 	claims := req.Context().Value(claimsCtxKey{}).(jwt.MapClaims)
 
 	if claims["sub"] != post.AuthorID {
-		http.Error(res, "Forbidden: You do not have permissions to perform this action", http.StatusForbidden)
+		renderForbiddenResponse(res)
 		return
 	}
 
 	if err := DbInsert(&post); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		renderErrorResponse(res, err)
 		return
 	}
 
-	renderJsonResponse(res, post.ToJson())
-	res.Header().Add("location", fmt.Sprintf("/api/post/%v", post.ID))
 	res.WriteHeader(http.StatusCreated)
+	res.Header().Add("location", fmt.Sprintf("/api/post/%v", post.ID))
+	renderJsonResponse(res, post)
 }
 
 func listPosts(res http.ResponseWriter, req *http.Request) {
 	limit, offset := getPaginationParams(req)
 
-	if posts, err := DbReadAll(limit, offset); err == nil {
-		renderJsonResponse(res, ToJson(posts))
+	if posts, err := DbReadAll(limit, offset); err != nil {
+		renderErrorResponse(res, err)
 	} else {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		renderJsonResponse(res, posts)
 	}
 }
 
@@ -78,14 +79,15 @@ func readPost(res http.ResponseWriter, req *http.Request) {
 
 	post, err := DbReadById(id)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		renderErrorResponse(res, err)
 		return
 	}
 	if (post == Post{}) {
-		http.Error(res, "Not found", http.StatusNotFound)
+		renderNotFound(res)
 		return
 	}
-	renderJsonResponse(res, post.ToJson())
+
+	renderJsonResponse(res, post)
 }
 
 func updatePost(res http.ResponseWriter, req *http.Request) {
@@ -100,9 +102,9 @@ func updatePost(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if err := DbUpdate(post); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		renderErrorResponse(res, err)
 	}
-	renderJsonResponse(res, post.ToJson())
+	renderJsonResponse(res, post)
 }
 
 func deletePost(res http.ResponseWriter, req *http.Request) {
@@ -113,9 +115,8 @@ func deletePost(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := DbDelete(id); err == nil {
-		res.WriteHeader(http.StatusNoContent)
-	} else {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+	if err := DbDelete(id); err != nil {
+		renderErrorResponse(res, err)
 	}
+	res.WriteHeader(http.StatusNoContent)
 }

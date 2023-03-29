@@ -14,9 +14,9 @@ func DbInsert(post *Post) error {
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueStr(post.AuthorID),
 		postgres.ParameterValueStr(post.Content),
-		postgres.ParameterValueStr(post.Type),
+		postgres.ParameterValueStr(post.Type.String()),
 		postgres.ParameterValueStr(post.Data),
-		postgres.ParameterValueStr(post.Visibility),
+		postgres.ParameterValueStr(post.Visibility.String()),
 	}
 
 	_, err := postgres.Execute(db_url, statement, params)
@@ -89,9 +89,9 @@ func DbUpdate(post Post) error {
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueStr(post.AuthorID),
 		postgres.ParameterValueStr(post.Content),
-		postgres.ParameterValueStr(post.Type),
+		postgres.ParameterValueStr(post.Type.String()),
 		postgres.ParameterValueStr(post.Data),
-		postgres.ParameterValueStr(post.Visibility),
+		postgres.ParameterValueStr(post.Visibility.String()),
 		postgres.ParameterValueInt32(int32(post.ID)),
 	}
 
@@ -126,40 +126,44 @@ func assertValueKind(row []postgres.DbValue, col int, expected postgres.DbValueK
 func fromRow(row []postgres.DbValue) (Post, error) {
 	var post Post
 
-	if val, err := assertValueKind(row, 0, postgres.DbValueKindInt32); err == nil {
+	if val, err := assertValueKind(row, 0, postgres.DbValueKindInt32); err != nil {
+		return post, err
+	} else {
 		post.ID = int(val.GetInt32())
-	} else {
-		return post, err
 	}
 
-	if val, err := assertValueKind(row, 1, postgres.DbValueKindStr); err == nil {
+	if val, err := assertValueKind(row, 1, postgres.DbValueKindStr); err != nil {
+		return post, err
+	} else {
 		post.AuthorID = val.GetStr()
-	} else {
-		return post, err
 	}
 
-	if val, err := assertValueKind(row, 2, postgres.DbValueKindStr); err == nil {
+	if val, err := assertValueKind(row, 2, postgres.DbValueKindStr); err != nil {
+		return post, err
+	} else {
 		post.Content = val.GetStr()
-	} else {
-		return post, err
 	}
 
-	if val, err := assertValueKind(row, 3, postgres.DbValueKindStr); err == nil {
-		post.Type = val.GetStr()
-	} else {
+	if val, err := assertValueKind(row, 3, postgres.DbValueKindStr); err != nil {
 		return post, err
+	} else if val, err := ParsePostType(val.GetStr()); err != nil {
+		return post, err
+	} else {
+		post.Type = val
 	}
 
-	if val, err := assertValueKind(row, 4, postgres.DbValueKindStr); err == nil {
+	if val, err := assertValueKind(row, 4, postgres.DbValueKindStr); err != nil {
+		return post, err
+	} else {
 		post.Data = val.GetStr()
-	} else {
-		return post, err
 	}
 
-	if val, err := assertValueKind(row, 5, postgres.DbValueKindStr); err == nil {
-		post.Visibility = val.GetStr()
-	} else {
+	if val, err := assertValueKind(row, 5, postgres.DbValueKindStr); err != nil {
 		return post, err
+	} else if val, err := ParsePostVisibility(val.GetStr()); err != nil {
+		return post, err
+	} else {
+		post.Visibility = val
 	}
 
 	return post, nil

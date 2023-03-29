@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,19 +13,34 @@ import (
 
 // HTTP Response Helpers
 
-func renderJsonResponse(res http.ResponseWriter, json string) {
-	// write the post to the response as json
-	if _, err := io.WriteString(res, json); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-	} else {
-		res.WriteHeader(http.StatusOK)
-		res.Header().Add("Content-Type", "application/json")
-	}
+func renderBadRequestResponse(res http.ResponseWriter, msg string) {
+	http.Error(res, msg, http.StatusBadRequest)
 }
 
-func renderBadRequestResponse(res http.ResponseWriter, msg string) {
-	fmt.Print(msg)
-	http.Error(res, msg, http.StatusBadRequest)
+func renderErrorResponse(res http.ResponseWriter, err error) {
+	//TODO: does this work if the response has already been partially written to?
+	http.Error(res, err.Error(), http.StatusInternalServerError)
+}
+
+func renderForbiddenResponse(res http.ResponseWriter) {
+	// intentionally make this one obscure in case of malicious intent
+	http.Error(res, "Forbidden: You do not have permissions to perform this action", http.StatusForbidden)
+}
+
+func renderNotFound(res http.ResponseWriter) {
+	http.Error(res, "Not found", http.StatusNotFound)
+}
+
+func renderUnauthorized(res http.ResponseWriter, err error) {
+	http.Error(res, err.Error(), http.StatusUnauthorized)
+}
+
+func renderJsonResponse(res http.ResponseWriter, body any) {
+	if err := json.NewEncoder(res).Encode(body); err != nil {
+		renderErrorResponse(res, err)
+	} else {
+		res.Header().Add("Content-Type", "application/json")
+	}
 }
 
 // Pagination Helpers

@@ -29,30 +29,27 @@ func TokenVerification(next http.Handler) http.Handler {
 		if err != nil {
 			if errors.Is(err, jwt.ValidationError{}) {
 				// token parsed but was invalid
-				http.Error(res, err.Error(), http.StatusUnauthorized)
+				renderUnauthorized(res, err)
 			} else {
 				// unable to parse or verify signing
-				http.Error(res, err.Error(), http.StatusInternalServerError)
+				renderErrorResponse(res, err)
 			}
 			return
 		}
 
 		claims := token.Claims.(jwt.MapClaims)
 		if !token.Valid {
-			http.Error(res, "token not valid", http.StatusUnauthorized)
+			renderUnauthorized(res, fmt.Errorf("token not valid"))
 			return
 		}
 
-		fmt.Printf("Claims: %v\n", claims)
-
 		if !claims.VerifyIssuer(getIssuer(), true) {
-			fmt.Printf("Expected issuer %v but got %v", getIssuer(), claims["iss"])
-			http.Error(res, jwt.ErrTokenInvalidIssuer.Error(), http.StatusUnauthorized)
+			renderUnauthorized(res, jwt.ErrTokenInvalidIssuer)
 			return
 		}
 
 		if !claims.VerifyAudience(getAudience(), true) {
-			http.Error(res, jwt.ErrTokenInvalidAudience.Error(), http.StatusUnauthorized)
+			renderUnauthorized(res, jwt.ErrTokenInvalidAudience)
 			return
 		}
 
@@ -63,14 +60,11 @@ func TokenVerification(next http.Handler) http.Handler {
 
 func fetchAuthSigningKey(t *jwt.Token) (interface{}, error) {
 	jwksUri := getJwksUri()
-	println("Fetching auth signing key from: %v", jwksUri)
 	if jwks, err := keyfunc.Get(jwksUri, keyfunc.Options{
 		Client: NewHttpClient(),
 	}); err != nil {
-		println("Failed to fetch auth signing key: %v", err)
 		return nil, err
 	} else {
-		println("Successfully retrieved and parsed JWKS")
 		return jwks.Keyfunc(t)
 	}
 }
@@ -87,7 +81,7 @@ func PostCtx(next http.Handler) http.Handler {
 		var err error
 
 		if req.ContentLength > 0 && req.Header.Get("Content-Type") == "application/json" {
-			if post, err = ParseJsonPost(req.Body); err != nil {
+			if post, err = DecodePost(req.Body); err != nil {
 				// parsing failed end the request here
 				msg := fmt.Sprintf("Failed to parse the post from request body: %v\n", err)
 				renderBadRequestResponse(res, msg)
