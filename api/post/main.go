@@ -2,16 +2,21 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/MicahParks/keyfunc"
 	"github.com/fermyon/spin/sdk/go/config"
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
 	"github.com/fermyon/spin/sdk/go/postgres"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v4/request"
 	"github.com/valyala/fastjson"
 	"golang.org/x/exp/slices"
 )
@@ -22,6 +27,8 @@ func init() {
 	spinhttp.Handle(func(res http.ResponseWriter, req *http.Request) {
 		// we need to setup the router inside spin handler
 		router := chi.NewRouter()
+
+		router.Use(TokenVerification)
 
 		// mount our routes using the prefix
 		routePrefix := req.Header.Get("Spin-Component-Route")
@@ -79,15 +86,21 @@ func getPostId(r *http.Request) (int, error) {
 
 func createPost(res http.ResponseWriter, req *http.Request) {
 	post := req.Context().Value(postCtxKey{}).(Post)
+	claims := req.Context().Value(claimsCtxKey{}).(jwt.MapClaims)
 
-	err := DbInsert(&post)
-	if err == nil {
-		renderJsonResponse(res, post.ToJson())
-		res.Header().Add("location", fmt.Sprintf("/api/post/%v", post.ID))
-		res.WriteHeader(http.StatusCreated)
-	} else {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+	if claims["sub"] != post.AuthorID {
+		http.Error(res, "Forbidden: You do not have permissions to perform this action", http.StatusForbidden)
+		return
 	}
+
+	if err := DbInsert(&post); err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	renderJsonResponse(res, post.ToJson())
+	res.Header().Add("location", fmt.Sprintf("/api/post/%v", post.ID))
+	res.WriteHeader(http.StatusCreated)
 }
 
 func listPosts(res http.ResponseWriter, req *http.Request) {
@@ -416,14 +429,6 @@ func DbDelete(id int) error {
 
 // Database Helper Functions
 
-func getDbUrl() string {
-	db_url, err := config.Get("db_url")
-	if err != nil {
-		panic(fmt.Sprintf("Unable to retrieve 'db_url' config item: %v", err))
-	}
-	return db_url
-}
-
 func assertValueKind(row []postgres.DbValue, col int, expected postgres.DbValueKind) (postgres.DbValue, error) {
 	if row[col].Kind() != expected {
 		return postgres.DbValue{}, fmt.Errorf("Expected column %v to be %v kind but got %v\n", col, expected, row[col].Kind())
@@ -471,4 +476,109 @@ func fromRow(row []postgres.DbValue) (Post, error) {
 	}
 
 	return post, nil
+}
+
+// Config Helpers
+
+func configGetRequired(key string) string {
+	if val, err := config.Get(key); err != nil {
+		panic(fmt.Sprintf("Missing required config item 'jwks_uri': %v", err))
+	} else {
+		return val
+	}
+}
+
+func getIssuer() string {
+	domain := configGetRequired("auth_domain")
+	return fmt.Sprintf("https://%v/", domain)
+}
+
+func getAudience() string {
+	return configGetRequired("auth_audience")
+}
+
+func getJwksUri() string {
+	domain := configGetRequired("auth_domain")
+	return fmt.Sprintf("https://%v/.well-known/jwks.json", domain)
+}
+
+func getDbUrl() string {
+	return configGetRequired("db_url")
+}
+
+// Authorization Helpers
+
+type claimsCtxKey struct{}
+
+func TokenVerification(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		// ensure RS256 was used to sign the token
+		parserOpts := []request.ParseFromRequestOption{
+			request.WithParser(jwt.NewParser(jwt.WithValidMethods([]string{
+				jwt.SigningMethodRS256.Alg(),
+			}))),
+		}
+		token, err := request.ParseFromRequest(req, request.OAuth2Extractor, fetchAuthSigningKey, parserOpts...)
+		if err != nil {
+			if errors.Is(err, jwt.ValidationError{}) {
+				// token parsed but was invalid
+				http.Error(res, err.Error(), http.StatusUnauthorized)
+			} else {
+				// unable to parse or verify signing
+				http.Error(res, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		claims := token.Claims.(jwt.MapClaims)
+		if !token.Valid {
+			http.Error(res, "token not valid", http.StatusUnauthorized)
+			return
+		}
+
+		fmt.Printf("Claims: %v\n", claims)
+
+		if !claims.VerifyIssuer(getIssuer(), true) {
+			fmt.Printf("Expected issuer %v but got %v", getIssuer(), claims["iss"])
+			http.Error(res, jwt.ErrTokenInvalidIssuer.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		if !claims.VerifyAudience(getAudience(), true) {
+			http.Error(res, jwt.ErrTokenInvalidAudience.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(req.Context(), claimsCtxKey{}, claims)
+		next.ServeHTTP(res, req.WithContext(ctx))
+	})
+}
+
+func fetchAuthSigningKey(t *jwt.Token) (interface{}, error) {
+	jwksUri := getJwksUri()
+	println("Fetching auth signing key from: %v", jwksUri)
+	if jwks, err := keyfunc.Get(jwksUri, keyfunc.Options{
+		Client: NewHttpClient(),
+	}); err != nil {
+		println("Failed to fetch auth signing key: %v", err)
+		return nil, err
+	} else {
+		println("Successfully retrieved and parsed JWKS")
+		return jwks.Keyfunc(t)
+	}
+}
+
+// HTTP Helpers
+
+type spinRoundTripper struct{}
+
+func (t spinRoundTripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	return spinhttp.Send(req)
+}
+
+func NewHttpClient() *http.Client {
+	return &http.Client{
+		Transport: spinRoundTripper{},
+		Timeout:   time.Duration(5) * time.Second,
+	}
 }
