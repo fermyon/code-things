@@ -6,7 +6,6 @@ import (
 
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
 	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v4"
 )
 
 func main() {}
@@ -42,9 +41,8 @@ func PostRouter() chi.Router {
 
 func createPost(res http.ResponseWriter, req *http.Request) {
 	post := req.Context().Value(postCtxKey{}).(Post)
-	claims := req.Context().Value(claimsCtxKey{}).(jwt.MapClaims)
 
-	if claims["sub"] != post.AuthorID {
+	if getUserId(req) != post.AuthorID {
 		renderForbiddenResponse(res)
 		return
 	}
@@ -61,8 +59,9 @@ func createPost(res http.ResponseWriter, req *http.Request) {
 
 func listPosts(res http.ResponseWriter, req *http.Request) {
 	limit, offset := getPaginationParams(req)
+	authorId := getUserId(req)
 
-	if posts, err := DbReadAll(limit, offset); err != nil {
+	if posts, err := DbReadAll(limit, offset, authorId); err != nil {
 		renderErrorResponse(res, err)
 	} else {
 		renderJsonResponse(res, posts)
@@ -77,7 +76,9 @@ func readPost(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	post, err := DbReadById(id)
+	authorId := getUserId(req)
+
+	post, err := DbReadById(id, authorId)
 	if err != nil {
 		renderErrorResponse(res, err)
 		return
@@ -115,7 +116,9 @@ func deletePost(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := DbDelete(id); err != nil {
+	authorId := getUserId(req)
+
+	if err := DbDelete(id, authorId); err != nil {
 		renderErrorResponse(res, err)
 	}
 	res.WriteHeader(http.StatusNoContent)

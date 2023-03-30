@@ -9,6 +9,7 @@ import (
 
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // HTTP Response Helpers
@@ -61,7 +62,7 @@ func getPaginationParams(req *http.Request) (limit int, offset int) {
 	limit_param := chi.URLParam(req, "limit")
 	if limit_val, err := strconv.Atoi(limit_param); err != nil {
 		// error occurred, just use a default value
-		fmt.Printf("Failed to parse the limit from URL: %v", err)
+		fmt.Printf("Failed to parse the limit from URL: %v\n", err)
 		limit = 5
 	} else {
 		// clamp the value in case of invalid parameters (intentional or otherwise)
@@ -72,7 +73,7 @@ func getPaginationParams(req *http.Request) (limit int, offset int) {
 	offset_param := chi.URLParam(req, "offset")
 	if offset_val, err := strconv.Atoi(offset_param); err != nil {
 		// error occurred, just use a default value
-		fmt.Printf("Failed to parse the offset from URL: %v", err)
+		fmt.Printf("Failed to parse the offset from URL: %v\n", err)
 		offset = 0
 	} else {
 		// clamp the value in case of invalid parameters (intentional or otherwise)
@@ -81,6 +82,13 @@ func getPaginationParams(req *http.Request) (limit int, offset int) {
 	}
 
 	return limit, offset
+}
+
+// Auth Helpers
+
+func getUserId(req *http.Request) string {
+	claims := req.Context().Value(claimsCtxKey{}).(jwt.MapClaims)
+	return claims["sub"].(string)
 }
 
 // HTTP Client

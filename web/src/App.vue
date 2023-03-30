@@ -27,7 +27,7 @@ function logoutHandler() {
 
 const userNavItems = computed(() =>
   isAuthenticated.value
-    ? [{ text: "Profile", route: "/profile" }, { text: "Log Out", click: logoutHandler }]
+    ? [{ text: "Profile", route: "/profile" }, { text: "My Posts", route: "/posts" }, { text: "Log Out", click: logoutHandler }]
     : [{ text: "Log In", click: loginHandler }]
 );
 </script>

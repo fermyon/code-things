@@ -34,17 +34,18 @@ func DbInsert(post *Post) error {
 	if id_val.Kind() == postgres.DbValueKindInt64 {
 		post.ID = int(id_val.GetInt64())
 	} else {
-		fmt.Printf("Failed to populate created post's identifier, invalid kind returned from database: %v", id_val.Kind())
+		fmt.Printf("Failed to populate created post's identifier, invalid kind returned from database: %v\n", id_val.Kind())
 	}
 
 	return nil
 }
 
-func DbReadById(id int) (Post, error) {
+func DbReadById(id int, authorId string) (Post, error) {
 	db_url := getDbUrl()
-	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE id=$1"
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE id=$1 and author_id=$2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt32(int32(id)),
+		postgres.ParameterValueStr(authorId),
 	}
 
 	rowset, err := postgres.Query(db_url, statement, params)
@@ -59,12 +60,13 @@ func DbReadById(id int) (Post, error) {
 	}
 }
 
-func DbReadAll(limit int, offset int) ([]Post, error) {
+func DbReadAll(limit int, offset int, authorId string) ([]Post, error) {
 	db_url := getDbUrl()
-	statement := "SELECT id, author_id, content, type, data, visibility FROM posts ORDER BY id LIMIT $1 OFFSET $2"
+	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE author_id=$3 ORDER BY id LIMIT $1 OFFSET $2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt64(int64(limit)),
 		postgres.ParameterValueInt64(int64(offset)),
+		postgres.ParameterValueStr(authorId),
 	}
 	rowset, err := postgres.Query(db_url, statement, params)
 	if err != nil {
@@ -85,9 +87,8 @@ func DbReadAll(limit int, offset int) ([]Post, error) {
 
 func DbUpdate(post Post) error {
 	db_url := getDbUrl()
-	statement := "UPDATE posts SET author_id=$1, content=$2, type=$3, data=$4, visibility=$5 WHERE id=$6"
+	statement := "UPDATE posts SET content=$1, type=$2, data=$3, visibility=$4 WHERE id=$5"
 	params := []postgres.ParameterValue{
-		postgres.ParameterValueStr(post.AuthorID),
 		postgres.ParameterValueStr(post.Content),
 		postgres.ParameterValueStr(post.Type.String()),
 		postgres.ParameterValueStr(post.Data),
@@ -103,11 +104,12 @@ func DbUpdate(post Post) error {
 	return nil
 }
 
-func DbDelete(id int) error {
+func DbDelete(id int, authorId string) error {
 	db_url := getDbUrl()
-	statement := "DELETE FROM posts WHERE id=$1"
+	statement := "DELETE FROM posts WHERE id=$1 and author_id=$2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt32(int32(id)),
+		postgres.ParameterValueStr(authorId),
 	}
 
 	_, err := postgres.Execute(db_url, statement, params)
