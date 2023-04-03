@@ -1,1 +1,3 @@
 scripts/db/data/
+.spin/
+api/post/main.wasm

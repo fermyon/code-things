@@ -750,7 +750,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "spin-macro"
 version = "0.1.0"
-source = "git+https://github.com/fermyon/spin?tag=v0.7.0#73d315f2ab914cbbb69310af123c5d67d659f0e3"
+source = "git+https://github.com/fermyon/spin?tag=v1.0.0#df99be238267b498451993d47b7e42e17da95c09"
 dependencies = [
  "anyhow",
  "bytes",
@@ -765,8 +765,8 @@ dependencies = [
 
 [[package]]
 name = "spin-sdk"
-version = "0.7.0"
-source = "git+https://github.com/fermyon/spin?tag=v0.7.0#73d315f2ab914cbbb69310af123c5d67d659f0e3"
+version = "1.0.0"
+source = "git+https://github.com/fermyon/spin?tag=v1.0.0#df99be238267b498451993d47b7e42e17da95c09"
 dependencies = [
  "anyhow",
  "bytes",
