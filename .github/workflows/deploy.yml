@@ -9,7 +9,7 @@ on:
 
 jobs:
   spin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: Build application
     steps:
       - uses: actions/checkout@v3
@@ -29,9 +29,20 @@ jobs:
       - name: Setup `spin`
         uses: fermyon/actions/spin/setup@v1
 
-      - name: Echo versions
+      # this won't be necessary once v0.28 of tinygo is released
+      - name: Setup `tinygo`
         run: |
-          go version
-          spin --version
+          echo 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main' | sudo tee /etc/apt/sources.list.d/llvm.list
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install clang-15 llvm-15-dev lld-15 libclang-15-dev
+          go install github.com/tinygo-org/tinygo@dev
+
+      - name: Show Versions
+        run: |
           rustup show
-          env
+          echo "----------------------------"
+          go version
+          tinygo version
+          echo "----------------------------"
+          spin --version
