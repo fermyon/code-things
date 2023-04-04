@@ -37,7 +37,7 @@ jobs:
           
           # try to install wasi-libc for tinygo
           cd $(tinygo env TINYGOROOT)
-          git submodule update --init
+          git clone --depth 1 --branch wasi-sdk-16 https://github.com/CraneStation/wasi-libc lib/wasi-libc
           make wasi-libc
           cd -
 
