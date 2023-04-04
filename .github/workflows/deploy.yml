@@ -34,6 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install clang-15 llvm-15-dev lld-15 libclang-15-dev
           go install github.com/tinygo-org/tinygo@dev
+          which tinygo
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
