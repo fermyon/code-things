@@ -1,0 +1,33 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+    - main
+    - feature/deploy-to-cloud
+  workflow_dispatch:
+
+jobs:
+  spin:
+    runs-on: ubuntu-latest
+    name: Setup spin
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup `rust`
+        uses: dtolnay/rust-toolchain@stable
+        with:
+            targets: wasm32-wasi
+            components: clippy, rustfmt
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v4.0.0
+
+      - name: Setup `spin`
+        uses: fermyon/actions/spin/setup@v1
+
+      - name: Echo versions
+        run: |
+          go version
+          spin --version
+          rustup show
