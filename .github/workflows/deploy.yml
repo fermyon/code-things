@@ -28,6 +28,8 @@ jobs:
 
       - name: Setup `spin`
         uses: fermyon/actions/spin/setup@v1
+        with:
+          version: "canary"
 
       # this won't be necessary once v0.28 of tinygo is released
       - name: Setup `tinygo`
