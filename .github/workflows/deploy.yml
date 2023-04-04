@@ -46,3 +46,8 @@ jobs:
           tinygo version
           echo "----------------------------"
           spin --version
+
+      - name: Build & Deploy
+        uses: fermyon/actions/spin/deploy@v1
+        with:
+          fermyon_token: ${{ secrets.FERMYON_CLOUD_TOKEN }}
