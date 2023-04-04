@@ -14,31 +14,43 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup `rust`
+      - name: Setup rust
         uses: dtolnay/rust-toolchain@stable
         with:
             targets: wasm32-wasi
             components: clippy, rustfmt
 
-      - name: Setup Go environment
+      - name: Setup Go
         uses: actions/setup-go@v4.0.0
         with:
           go-version-file: 'api/post/go.mod'
           cache-dependency-path: 'api/post/go.sum'
 
-      - name: Setup `spin`
-        uses: fermyon/actions/spin/setup@v1
-        with:
-          version: "canary"
-
       # this won't be necessary once v0.28 of tinygo is released
-      - name: Setup `tinygo`
+      - name: Setup tinygo
         run: |
           echo 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main' | sudo tee /etc/apt/sources.list.d/llvm.list
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install clang-15 llvm-15-dev lld-15 libclang-15-dev
           go install github.com/tinygo-org/tinygo@dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2.5.2
+        with:
+          node-version: '>=18.13.0'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Setup spin
+        uses: fermyon/actions/spin/setup@v1
+        with:
+          version: canary
+
+      - name: Install dependencies
+        run: |
+          cd web
+          npm install
+          cd -
 
       - name: Show Versions
         run: |
