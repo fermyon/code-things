@@ -10,7 +10,7 @@ on:
 jobs:
   spin:
     runs-on: ubuntu-latest
-    name: Setup spin
+    name: Build application
     steps:
       - uses: actions/checkout@v3
 
@@ -34,3 +34,4 @@ jobs:
           go version
           spin --version
           rustup show
+          env
