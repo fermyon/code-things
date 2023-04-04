@@ -26,7 +26,7 @@ jobs:
           go-version-file: 'api/post/go.mod'
           cache-dependency-path: 'api/post/go.sum'
 
-      # this won't be necessary once v0.28 of tinygo is released
+      # building tinygo from source to use new 'reflect' and 'encoding/json' features
       - name: Setup tinygo
         run: |
           echo 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main' | sudo tee /etc/apt/sources.list.d/llvm.list
@@ -35,7 +35,10 @@ jobs:
           sudo apt-get install clang-15 llvm-15-dev lld-15 libclang-15-dev
           go install github.com/tinygo-org/tinygo@dev
           
-          tinygo env
+          # try to install wasi-libc for tinygo
+          cd $(tinygo env TINYGOROOT)
+          make wasi-libc
+          cd -
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
