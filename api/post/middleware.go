@@ -43,12 +43,12 @@ func TokenVerification(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.VerifyIssuer(getIssuer(), true) {
+		if !claims.VerifyIssuer(cfg.Issuer, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidIssuer)
 			return
 		}
 
-		if !claims.VerifyAudience(getAudience(), true) {
+		if !claims.VerifyAudience(cfg.Audience, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidAudience)
 			return
 		}
@@ -59,8 +59,8 @@ func TokenVerification(next http.Handler) http.Handler {
 }
 
 func fetchAuthSigningKey(t *jwt.Token) (interface{}, error) {
-	jwksUri := getJwksUri()
-	if jwks, err := keyfunc.Get(jwksUri, keyfunc.Options{
+
+	if jwks, err := keyfunc.Get(cfg.JwksUrl, keyfunc.Options{
 		Client: NewHttpClient(),
 	}); err != nil {
 		return nil, err

@@ -9,7 +9,6 @@ import (
 // Database Operations
 
 func DbInsert(post *Post) error {
-	db_url := getDbUrl()
 	statement := "INSERT INTO posts (author_id, content, type, data, visibility) VALUES ($1, $2, $3, $4, $5)"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueStr(post.AuthorID),
@@ -19,13 +18,13 @@ func DbInsert(post *Post) error {
 		postgres.ParameterValueStr(post.Visibility.String()),
 	}
 
-	_, err := postgres.Execute(db_url, statement, params)
+	_, err := postgres.Execute(cfg.DbUrl, statement, params)
 	if err != nil {
 		return fmt.Errorf("Error inserting into database: %s", err.Error())
 	}
 
 	// this is a gross hack that will surely bite me later
-	rowset, err := postgres.Query(db_url, "SELECT lastval()", []postgres.ParameterValue{})
+	rowset, err := postgres.Query(cfg.DbUrl, "SELECT lastval()", []postgres.ParameterValue{})
 	if err != nil || len(rowset.Rows) != 1 || len(rowset.Rows[0]) != 1 {
 		return fmt.Errorf("Error querying id from database: %s", err.Error())
 	}
@@ -41,14 +40,13 @@ func DbInsert(post *Post) error {
 }
 
 func DbReadById(id int, authorId string) (Post, error) {
-	db_url := getDbUrl()
 	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE id=$1 and author_id=$2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt32(int32(id)),
 		postgres.ParameterValueStr(authorId),
 	}
 
-	rowset, err := postgres.Query(db_url, statement, params)
+	rowset, err := postgres.Query(cfg.DbUrl, statement, params)
 	if err != nil {
 		return Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
 	}
@@ -61,14 +59,13 @@ func DbReadById(id int, authorId string) (Post, error) {
 }
 
 func DbReadAll(limit int, offset int, authorId string) ([]Post, error) {
-	db_url := getDbUrl()
 	statement := "SELECT id, author_id, content, type, data, visibility FROM posts WHERE author_id=$3 ORDER BY id LIMIT $1 OFFSET $2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt64(int64(limit)),
 		postgres.ParameterValueInt64(int64(offset)),
 		postgres.ParameterValueStr(authorId),
 	}
-	rowset, err := postgres.Query(db_url, statement, params)
+	rowset, err := postgres.Query(cfg.DbUrl, statement, params)
 	if err != nil {
 		return []Post{}, fmt.Errorf("Error reading from database: %s", err.Error())
 	}
@@ -86,7 +83,6 @@ func DbReadAll(limit int, offset int, authorId string) ([]Post, error) {
 }
 
 func DbUpdate(post Post) error {
-	db_url := getDbUrl()
 	statement := "UPDATE posts SET content=$1, type=$2, data=$3, visibility=$4 WHERE id=$5"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueStr(post.Content),
@@ -96,7 +92,7 @@ func DbUpdate(post Post) error {
 		postgres.ParameterValueInt32(int32(post.ID)),
 	}
 
-	_, err := postgres.Execute(db_url, statement, params)
+	_, err := postgres.Execute(cfg.DbUrl, statement, params)
 	if err != nil {
 		return fmt.Errorf("Error updating database: %s", err.Error())
 	}
@@ -105,14 +101,13 @@ func DbUpdate(post Post) error {
 }
 
 func DbDelete(id int, authorId string) error {
-	db_url := getDbUrl()
 	statement := "DELETE FROM posts WHERE id=$1 and author_id=$2"
 	params := []postgres.ParameterValue{
 		postgres.ParameterValueInt32(int32(id)),
 		postgres.ParameterValueStr(authorId),
 	}
 
-	_, err := postgres.Execute(db_url, statement, params)
+	_, err := postgres.Execute(cfg.DbUrl, statement, params)
 	return err
 }
 
