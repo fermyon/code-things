@@ -31,6 +31,7 @@ workdir = "web"
 id = "profile-api"
 source = "api/profile/target/wasm32-wasi/release/profile_api.wasm"
 allowed_http_hosts = [ "dev-czhnnl8ikcojc040.us.auth0.com" ]
+key_value_stores = ["default"]
 [component.trigger]
 route = "/api/profile/..."
 [component.build]
@@ -47,6 +48,7 @@ auth_max_validity_secs = "{{ auth_max_validity_secs }}"
 id = "post"
 source = "./api/post/main.wasm"
 allowed_http_hosts = [ "dev-czhnnl8ikcojc040.us.auth0.com" ]
+key_value_stores = ["default"]
 [component.trigger]
 route = "/api/post/..."
 [component.build]

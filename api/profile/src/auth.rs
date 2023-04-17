@@ -1,3 +1,5 @@
+use chrono::{TimeZone, Utc};
+
 use anyhow::{bail, Result};
 use base64::{alphabet, engine, Engine as _};
 use jwt_simple::prelude::*;
@@ -45,16 +47,44 @@ pub(crate) struct JsonWebKeySet {
     keys: Vec<JsonWebKey>,
 }
 
+fn get_cached_jwks(store: &spin_sdk::key_value::Store) -> Option<bytes::Bytes> {
+    let expiry = store.get("jwks_ttl").ok()?;
+    let expiry = expiry.try_into().ok()?;
+    let expiry = Utc
+        .timestamp_millis_opt(i64::from_le_bytes(expiry))
+        .single()?;
+    if expiry <= Utc::now() {
+        return None;
+    }
+    let jwks = store.get("jwks").ok()?;
+    Some(bytes::Bytes::from(jwks))
+}
+
+fn set_cached_jwks(store: &spin_sdk::key_value::Store, jwks: bytes::Bytes) -> Result<()> {
+    let expiry = Utc::now() + chrono::Duration::minutes(5);
+    let expiry = expiry.timestamp_millis().to_le_bytes();
+    store.set("jwks_ttl", expiry)?;
+    store.set("jwks", jwks)?;
+    Ok(())
+}
+
 impl JsonWebKeySet {
-    pub fn get(url: String) -> Result<Self> {
-        let res = outbound_http::send_request(
-            http::Request::builder().method("GET").uri(url).body(None)?,
-        )?;
-        let res_body = match res.body().as_ref() {
-            Some(bytes) => bytes.slice(..),
-            None => bytes::Bytes::default(),
+    pub fn get(url: String, store: &spin_sdk::key_value::Store) -> Result<Self> {
+        let jwks_bytes = match get_cached_jwks(&store) {
+            Some(jwks) => jwks,
+            None => {
+                let res = outbound_http::send_request(
+                    http::Request::builder().method("GET").uri(url).body(None)?,
+                )?;
+                let res_body = match res.body().as_ref() {
+                    Some(bytes) => bytes.slice(..),
+                    None => bytes::Bytes::default(),
+                };
+                set_cached_jwks(&store, res_body.to_owned())?;
+                res_body
+            }
         };
-        Ok(serde_json::from_slice::<JsonWebKeySet>(&res_body)?)
+        Ok(serde_json::from_slice::<JsonWebKeySet>(&jwks_bytes)?)
     }
 
     pub fn verify(
