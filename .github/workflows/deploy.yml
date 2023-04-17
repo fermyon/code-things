@@ -11,6 +11,8 @@ jobs:
   spin:
     runs-on: ubuntu-22.04
     name: Build application
+    env:
+      tinygo-dev-image-tag: sha-8b9bee4cad5693105c1ee268ea29e5d3f8cb5408
     steps:
       - uses: actions/checkout@v3
 
@@ -26,19 +28,29 @@ jobs:
           go-version-file: 'api/post/go.mod'
           cache-dependency-path: 'api/post/go.sum'
 
+      - name: Cache tinygo
+        id: cache-tinygo
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-tinygo
+        with:
+          path: ~/tinygo
+          key: tinygo-dev-${{ env.tinygo-dev-image-tag }}
+
       # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
-      - name: Setup tinygo
+      - name: Download tinygo
+        if: ${{ steps.cache-tinygo.outputs.cache-hit != 'true' }}
         run: |
           # download tinygo from 'dev' branch docker container
-          IMAGE_TAG="ghcr.io/tinygo-org/tinygo-dev:sha-8b9bee4cad5693105c1ee268ea29e5d3f8cb5408"
-          docker pull ${IMAGE_TAG}
-          CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
+          docker pull ghcr.io/tinygo-org/tinygo-dev:${TINYGO_DEV_IMAGE_TAG}
+          CONTAINER=$(docker create --platform=linux/amd64 ghcr.io/tinygo-org/tinygo-dev:${TINYGO_DEV_IMAGE_TAG})
           docker cp ${CONTAINER}:/tinygo/ .
           docker rm -v ${CONTAINER}
 
+      - name: Setup tinygo
+        run: |
           # set the tinygo root path
           echo "TINYGOROOT=$(pwd)/tinygo" >> $GITHUB_ENV
-
           # add tinygo to gopath
           GOPATH=$(go env GOPATH)
           cp ./tinygo/build/* $(go env GOPATH)/bin
