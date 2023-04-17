@@ -29,13 +29,19 @@ jobs:
       # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
       - name: Setup tinygo
         run: |
-          GOPATH=$(go env GOPATH)
+          # download tinygo from 'dev' branch docker container
           IMAGE_TAG="ghcr.io/tinygo-org/tinygo-dev:sha-8b9bee4cad5693105c1ee268ea29e5d3f8cb5408"
           docker pull ${IMAGE_TAG}
           CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
-          docker cp ${CONTAINER}:/tinygo/build/tinygo $GOPATH/bin/
-          docker cp ${CONTAINER}:/tinygo/build/wasm-opt $GOPATH/bin/
+          docker cp ${CONTAINER}:/tinygo/ .
           docker rm -v ${CONTAINER}
+
+          # set the tinygo root path
+          echo "TINYGOROOT=$(pwd)/tinygo" >> $GITHUB_ENV
+
+          # add tinygo to gopath
+          GOPATH=$(go env GOPATH)
+          cp ./tinygo/build/* $(go env GOPATH)/bin
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
