@@ -40,10 +40,12 @@ jobs:
       # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
       - name: Download tinygo
         if: ${{ steps.cache-tinygo.outputs.cache-hit != 'true' }}
+        env:
+          IMAGE_TAG: ghcr.io/tinygo-org/tinygo-dev:${{ env.tinygo-dev-image-tag }}
         run: |
           # download tinygo from 'dev' branch docker container
-          docker pull ghcr.io/tinygo-org/tinygo-dev:${TINYGO_DEV_IMAGE_TAG}
-          CONTAINER=$(docker create --platform=linux/amd64 ghcr.io/tinygo-org/tinygo-dev:${TINYGO_DEV_IMAGE_TAG})
+          docker pull ${IMAGE_TAG}
+          CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
           docker cp ${CONTAINER}:/tinygo/ .
           docker rm -v ${CONTAINER}
 
