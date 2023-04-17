@@ -26,20 +26,15 @@ jobs:
           go-version-file: 'api/post/go.mod'
           cache-dependency-path: 'api/post/go.sum'
 
-      # building tinygo from source to use new 'reflect' and 'encoding/json' features
+      # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
       - name: Setup tinygo
         run: |
-          echo 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main' | sudo tee /etc/apt/sources.list.d/llvm.list
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo apt-get update
-          sudo apt-get install clang-15 llvm-15-dev lld-15 libclang-15-dev
-          go install github.com/tinygo-org/tinygo@dev
-          
-          # try to install wasi-libc for tinygo
-          cd $(tinygo env TINYGOROOT)
-          git clone --depth 1 --branch wasi-sdk-16 https://github.com/CraneStation/wasi-libc lib/wasi-libc
-          make wasi-libc
-          cd -
+          IMAGE_TAG="ghcr.io/tinygo-org/tinygo-dev:sha-8b9bee4cad5693105c1ee268ea29e5d3f8cb5408"
+          docker pull ${IMAGE_TAG}
+          CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
+          docker cp ${CONTAINER}:/tinygo/build/tinygo $GOPATH/bin/
+          docker cp ${CONTAINER}:/tinygo/build/wasm-opt $GOPATH/bin/
+          docker rm -v ${CONTAINER}
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
