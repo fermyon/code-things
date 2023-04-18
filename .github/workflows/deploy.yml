@@ -74,16 +74,10 @@ jobs:
           npm install
           cd -
 
-      - name: Show Versions
-        run: |
-          rustup show
-          echo "----------------------------"
-          go version
-          tinygo version
-          echo "----------------------------"
-          spin --version
-
       - name: Build & Deploy
-        uses: fermyon/actions/spin/deploy@v1
-        with:
-          fermyon_token: ${{ secrets.FERMYON_CLOUD_TOKEN }}
+        run: |
+          spin login --token ${{ secrets.FERMYON_CLOUD_TOKEN }}
+          spin deploy \
+            --key-value "db_url=${{ secrets.PGCONNSTR }}" \
+            --key-value "auth_domain=${{ vars.AUTH_DOMAIN }}" \
+            --key-value "auth_audience=${{ vars.AUTH_AUDIENCE }}"
