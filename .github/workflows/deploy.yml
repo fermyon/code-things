@@ -46,7 +46,7 @@ jobs:
           # download tinygo from 'dev' branch docker container
           docker pull ${IMAGE_TAG}
           CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
-          docker cp ${CONTAINER}:/tinygo/ .
+          docker cp ${CONTAINER}:/tinygo/ ~
           docker rm -v ${CONTAINER}
 
       - name: Setup tinygo
@@ -56,6 +56,8 @@ jobs:
           # add tinygo to gopath
           GOPATH=$(go env GOPATH)
           cp ./tinygo/build/* $(go env GOPATH)/bin
+          # debug home paths
+          ls -al ~
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
@@ -77,6 +79,7 @@ jobs:
       - name: Build & Deploy
         run: |
           spin login --token ${{ secrets.FERMYON_CLOUD_TOKEN }}
+          spin build
           spin deploy \
             --key-value "db_url=${{ secrets.PGCONNSTR }}" \
             --key-value "auth_domain=${{ vars.AUTH_DOMAIN }}" \
