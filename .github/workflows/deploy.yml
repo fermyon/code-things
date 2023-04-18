@@ -55,7 +55,7 @@ jobs:
           echo "TINYGOROOT=$(pwd)/tinygo" >> $GITHUB_ENV
           # add tinygo to gopath
           GOPATH=$(go env GOPATH)
-          cp ./tinygo/build/* $(go env GOPATH)/bin
+          cp ~/tinygo/build/* $(go env GOPATH)/bin
           # debug home paths
           ls -al ~
 
