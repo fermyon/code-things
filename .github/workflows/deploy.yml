@@ -72,6 +72,10 @@ jobs:
           version: canary
 
       - name: Install Dependencies & Configure
+        env:
+          AUTH_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+          AUTH_AUDIENCE: ${{ vars.AUTH_AUDIENCE }}
+          AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
         run: |
           cd web
           npm install
