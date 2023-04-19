@@ -38,7 +38,7 @@ const userNavItems = computed(() =>
       <NavLink href="/">
         <img
           class="h-8 w-auto lg:block"
-          src="@/assets/logo.svg"
+          src="@/assets/logo-white.svg"
           alt="Code Things"
         />
       </NavLink>
