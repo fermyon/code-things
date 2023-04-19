@@ -48,13 +48,18 @@ fn profile_api(req: Request) -> Result<Response> {
     let profile = profile.with_id(claims.subject);
 
     // match api action to handler
-    match api_from_profile(method, profile) {
+    let result = match api_from_profile(method, profile) {
         Api::Create(profile) => handle_create(&cfg.db_url, profile),
         Api::Update(profile) => handle_update(&cfg.db_url, profile),
         Api::ReadById(id) => handle_read_by_id(&cfg.db_url, id),
         Api::DeleteById(id) => handle_delete_by_id(&cfg.db_url, id),
         Api::MethodNotAllowed => method_not_allowed(),
         Api::NotFound => not_found(),
+    };
+
+    match result {
+        Ok(response) => Ok(response),
+        Err(e) => internal_server_error(e.to_string()),
     }
 }
 
@@ -78,8 +83,6 @@ fn claims_from_request(
         required_subject: subject.to_owned(),
         ..Default::default()
     };
-
-    println!("[DEBUG] {:#?}", options);
 
     let claims = keys
         .verify(token, Some(options))
@@ -134,7 +137,7 @@ fn handle_read_by_id(db_url: &str, id: String) -> Result<Response> {
 
 fn handle_update(db_url: &str, model: Profile) -> Result<Response> {
     model.update(&db_url)?;
-    handle_read_by_id(&db_url, model.handle)
+    handle_read_by_id(&db_url, model.id.expect("Profile id is required"))
 }
 
 fn handle_delete_by_id(db_url: &str, id: String) -> Result<Response> {

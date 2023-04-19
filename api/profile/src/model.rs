@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Ok, Result};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
@@ -88,23 +88,28 @@ impl Profile {
                 None => ParameterValue::DbNull,
             },
         ];
-        db::execute(
+        match db::execute(
             db_url,
             "INSERT INTO profiles (id, handle, avatar) VALUES ($1, $2, $3)",
             &params,
-        )
-        .context("Executing insert statement failed")?;
-        Ok(())
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("Inserting profile failed: {:?}", e)),
+        }
     }
 
     pub(crate) fn get_by_id(id: &str, db_url: &str) -> Result<Profile> {
         let params = vec![ParameterValue::Str(id)];
-        let row_set = db::query(
+        let row_set = match db::query(
             db_url,
             "SELECT id, handle, avatar from profiles WHERE id = $1",
             &params,
-        )
-        .context("Query profile by id statement failed")?;
+        ) {
+            Ok(row_set) => row_set,
+            Err(e) => {
+                return Err(anyhow!("Failed to get profile by id '{:?}': {:?}", id, e))
+            }
+        };
 
         let columns = get_column_lookup(&row_set.columns);
 
@@ -120,19 +125,21 @@ impl Profile {
             as_nullable_param(&self.avatar),
             as_param(&self.id).ok_or(anyhow!("The id field is currently required for update"))?,
         ];
-        db::execute(
+        match db::execute(
             db_url,
             "UPDATE profiles SET handle=$1, avatar=$2 WHERE id=$3",
             &params,
-        )
-        .context("Executing update by ID statement failed")?;
-        Ok(())
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("Updating profile failed: {:?}", e)),
+        }
     }
 
     pub(crate) fn delete_by_id(id: &str, db_url: &str) -> Result<()> {
         let params = vec![ParameterValue::Str(id)];
-        db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params)
-            .context("Executing delete by id statement failed")?;
-        Ok(())
+        match db::execute(db_url, "DELETE FROM profiles WHERE id=$1", &params) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("Deleting profile failed: {:?}", e)),
+        }
     }
 }

@@ -1,35 +1,54 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useAuth0 } from "@auth0/auth0-vue";
+import { profile as api } from "@/api";
 const { user, getAccessTokenSilently } = useAuth0();
 
-const handle = ref(user.value.nickname);
-const avatar = ref(user.value.picture);
+const id = ref<string | undefined>();
+const avatar = ref<string | undefined>(user.value.picture);
+const handle = ref<string | undefined>(user.value.nickname);
+
+onMounted(async () => {
+  if (!user.value.sub) {
+    return;
+  }
+  const accessToken = await getAccessTokenSilently();
+  const profileRequest = await api.get(accessToken, user.value.sub);
+  if (profileRequest.ok) {
+    const profile = await profileRequest.json();
+    id.value = profile.id;
+    handle.value = profile.handle;
+    avatar.value = profile.avatar;
+  } else {
+    console.log("No profile found, using user info instead.")
+  }
+})
 
 async function submit() {
-  try {
-    const accessToken = await getAccessTokenSilently();
-    const profile = {
-      handle: handle.value,
-      avatar: avatar.value,
-    };
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(profile),
-    });
-    if (response.ok) {
-      const updatedProfile = await response.json();
-      handle.value = updatedProfile.handle;
-      avatar.value = updatedProfile.avatar;
-    } else {
-      const message = await response.text();
-      console.error(`Profile API Error: ${response.statusText} ${message}`);
-    }
-  } catch (ex) {
-    console.log(ex);
+  if (handle.value === undefined || avatar.value === undefined) {
+    console.error("Handle and avatar are required.");
+    return;
+  }
+  const profile = {
+    id: id.value,
+    handle: handle.value,
+    avatar: avatar.value,
+  };
+  const accessToken = await getAccessTokenSilently();
+  let response;
+  if (id.value) {
+    response = await api.update(accessToken, profile);
+  } else {
+    response = await api.create(accessToken, profile);
+  }
+  if (response.ok) {
+    const updatedProfile = await response.json();
+    id.value = updatedProfile.id;
+    handle.value = updatedProfile.handle;
+    avatar.value = updatedProfile.avatar;
+  } else {
+    const message = await response.text();
+    console.error(`Profile API Error: ${response.statusText} ${message}`);
   }
 }
 </script>
