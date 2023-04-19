@@ -71,17 +71,18 @@ jobs:
         with:
           version: canary
 
-      - name: Install dependencies
+      - name: Install Dependencies & Configure
         run: |
           cd web
           npm install
+          cat << EOF > .env.production.local
+          VITE_AUTH0_DOMAIN = "$AUTH_DOMAIN"
+          VITE_AUTH0_AUDIENCE ="$AUTH_AUDIENCE"
+          VITE_AUTH0_CLIENT_ID = "$AUTH_CLIENT_ID"
+          EOF
           cd -
 
       - name: Build & Deploy
-        env:
-          VITE_AUTH0_DOMAIN: ${{ vars.AUTH_DOMAIN }}
-          VITE_AUTH0_AUDIENCE: ${{ vars.AUTH_AUDIENCE }}
-          VITE_AUTH0_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
         run: |
           spin login --token ${{ secrets.FERMYON_CLOUD_TOKEN }}
           spin build
