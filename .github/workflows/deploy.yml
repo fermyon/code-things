@@ -34,7 +34,7 @@ jobs:
         env:
           cache-name: cache-tinygo
         with:
-          path: ~/tinygo
+          path: ${{ env.GITHUB_WORKSPACE }}/tinygo
           key: tinygo-dev-${{ env.tinygo-dev-image-tag }}
 
       # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
@@ -46,18 +46,19 @@ jobs:
           # download tinygo from 'dev' branch docker container
           docker pull ${IMAGE_TAG}
           CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
-          docker cp ${CONTAINER}:/tinygo/ ~
+          docker cp ${CONTAINER}:/tinygo/ ${{ env.GITHUB_WORKSPACE }}
           docker rm -v ${CONTAINER}
 
       - name: Setup tinygo
         run: |
           # set the tinygo root path
-          echo "TINYGOROOT=$(pwd)/tinygo" >> $GITHUB_ENV
+          echo "TINYGOROOT=${{ env.GITHUB_WORKSPACE }}/tinygo" >> $GITHUB_ENV
           # add tinygo to gopath
           GOPATH=$(go env GOPATH)
-          cp ~/tinygo/build/* $(go env GOPATH)/bin
+          cp ${{ env.GITHUB_WORKSPACE }}/tinygo/build/* $(go env GOPATH)/bin
           # debug home paths
-          ls -al ~
+          ls -al ${{ env.GITHUB_WORKSPACE }}
+          env
 
       - name: Setup Node.js
         uses: actions/setup-node@v2.5.2
@@ -77,6 +78,10 @@ jobs:
           cd -
 
       - name: Build & Deploy
+        env:
+          VITE_AUTH0_DOMAIN: ${{ vars.AUTH_DOMAIN }}
+          VITE_AUTH0_AUDIENCE: ${{ vars.AUTH_AUDIENCE }}
+          VITE_AUTH0_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
         run: |
           spin login --token ${{ secrets.FERMYON_CLOUD_TOKEN }}
           spin build
