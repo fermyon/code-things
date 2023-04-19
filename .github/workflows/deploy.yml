@@ -34,7 +34,7 @@ jobs:
         env:
           cache-name: cache-tinygo
         with:
-          path: ${{ env.GITHUB_WORKSPACE }}/tinygo
+          path: ${{ github.workspace }}/tinygo
           key: tinygo-dev-${{ env.tinygo-dev-image-tag }}
 
       # download tinygo from dev docker container to use new 'reflect' and 'encoding/json' features
@@ -46,18 +46,18 @@ jobs:
           # download tinygo from 'dev' branch docker container
           docker pull ${IMAGE_TAG}
           CONTAINER=$(docker create --platform=linux/amd64 ${IMAGE_TAG})
-          docker cp ${CONTAINER}:/tinygo/ ${{ env.GITHUB_WORKSPACE }}
+          docker cp ${CONTAINER}:/tinygo/ $GITHUB_WORKSPACE
           docker rm -v ${CONTAINER}
 
       - name: Setup tinygo
         run: |
           # set the tinygo root path
-          echo "TINYGOROOT=${{ env.GITHUB_WORKSPACE }}/tinygo" >> $GITHUB_ENV
+          echo "TINYGOROOT=$GITHUB_WORKSPACE/tinygo" >> $GITHUB_ENV
           # add tinygo to gopath
           GOPATH=$(go env GOPATH)
-          cp ${{ env.GITHUB_WORKSPACE }}/tinygo/build/* $(go env GOPATH)/bin
+          cp $GITHUB_WORKSPACE/tinygo/build/* $(go env GOPATH)/bin
           # debug home paths
-          ls -al ${{ env.GITHUB_WORKSPACE }}
+          ls -al $GITHUB_WORKSPACE
           env
 
       - name: Setup Node.js
