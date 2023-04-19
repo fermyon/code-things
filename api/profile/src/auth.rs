@@ -1,4 +1,4 @@
-use chrono::{TimeZone, Utc, LocalResult};
+use chrono::{LocalResult, TimeZone, Utc};
 
 use anyhow::{bail, Result};
 use base64::{alphabet, engine, Engine as _};
@@ -52,19 +52,19 @@ fn get_cached_jwks(store: &spin_sdk::key_value::Store) -> Result<bytes::Bytes> {
         Ok(expiry) => expiry,
         Err(_) => {
             return Err(anyhow::anyhow!("No cached JWKS found."));
-        },
+        }
     };
     let expiry = match expiry.try_into() {
         Ok(expiry) => expiry,
         Err(_) => {
             return Err(anyhow::anyhow!("Cached JWKS has invalid expiry."));
-        },
+        }
     };
     let expiry = match Utc.timestamp_millis_opt(i64::from_le_bytes(expiry)) {
         LocalResult::Single(expiry) => expiry,
         _ => {
             return Err(anyhow::anyhow!("Cached JWKS has invalid expiry."));
-        },
+        }
     };
     if expiry <= Utc::now() {
         return Err(anyhow::anyhow!("Cached JWKS has expired."));
@@ -73,7 +73,7 @@ fn get_cached_jwks(store: &spin_sdk::key_value::Store) -> Result<bytes::Bytes> {
         Ok(jwks) => Ok(bytes::Bytes::from(jwks)),
         Err(_) => {
             return Err(anyhow::anyhow!("No cached JWKS found."));
-        },
+        }
     }
 }
 
@@ -91,7 +91,10 @@ impl JsonWebKeySet {
             Ok(jwks) => jwks,
             Err(cache_err) => {
                 println!("Error getting cached JWKS: {}", cache_err);
-                let req_body = http::Request::builder().method("GET").uri(&url).body(None)?;
+                let req_body = http::Request::builder()
+                    .method("GET")
+                    .uri(&url)
+                    .body(None)?;
                 let res = match outbound_http::send_request(req_body) {
                     Ok(res) => res,
                     Err(e) => {
@@ -102,8 +105,11 @@ impl JsonWebKeySet {
                 let res_body = match res.body().as_ref() {
                     Some(bytes) => bytes.slice(..),
                     None => {
-                        return Err(anyhow::anyhow!(format!("Error getting JWKS from url {}: no body", &url)));
-                    },
+                        return Err(anyhow::anyhow!(format!(
+                            "Error getting JWKS from url {}: no body",
+                            &url
+                        )));
+                    }
                 };
                 if let Err(e) = set_cached_jwks(&store, res_body.clone()) {
                     println!("Error caching JWKS: {}", e);

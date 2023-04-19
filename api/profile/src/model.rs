@@ -106,9 +106,7 @@ impl Profile {
             &params,
         ) {
             Ok(row_set) => row_set,
-            Err(e) => {
-                return Err(anyhow!("Failed to get profile by id '{:?}': {:?}", id, e))
-            }
+            Err(e) => return Err(anyhow!("Failed to get profile by id '{:?}': {:?}", id, e)),
         };
 
         let columns = get_column_lookup(&row_set.columns);
