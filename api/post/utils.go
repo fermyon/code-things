@@ -8,7 +8,6 @@ import (
 	"time"
 
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -59,7 +58,7 @@ func getPaginationParams(req *http.Request) (limit int, offset int) {
 	}
 
 	// get the limit from the URL
-	limit_param := chi.URLParam(req, "limit")
+	limit_param := req.URL.Query().Get("limit")
 	if limit_val, err := strconv.Atoi(limit_param); err != nil {
 		// error occurred, just use a default value
 		fmt.Printf("Failed to parse the limit from URL: %v\n", err)
@@ -70,7 +69,7 @@ func getPaginationParams(req *http.Request) (limit int, offset int) {
 	}
 
 	// get the offset from the URL
-	offset_param := chi.URLParam(req, "offset")
+	offset_param := req.URL.Query().Get("offset")
 	if offset_val, err := strconv.Atoi(offset_param); err != nil {
 		// error occurred, just use a default value
 		fmt.Printf("Failed to parse the offset from URL: %v\n", err)
