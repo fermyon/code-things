@@ -28,7 +28,7 @@ enum Api {
 #[http_component]
 fn profile_api(req: Request) -> Result<Response> {
     let store = spin_sdk::key_value::Store::open_default()?;
-    let cfg = Config::default();
+    let cfg = Config::try_get(&store)?;
 
     // parse the profile from the request
     let method = req.method();
