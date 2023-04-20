@@ -47,12 +47,12 @@ func TokenVerification(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.VerifyIssuer(getIssuer(), true) {
+		if !claims.VerifyIssuer(cfg.Issuer, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidIssuer)
 			return
 		}
 
-		if !claims.VerifyAudience(getAudience(), true) {
+		if !claims.VerifyAudience(cfg.Audience, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidAudience)
 			return
 		}
@@ -68,7 +68,7 @@ func cachedJwksKeyfunc(t *jwt.Token) (interface{}, error) {
 	} else {
 		return jwks.Keyfunc(t)
 	}
-	if jwks, err := keyfunc.Get(getJwksUri(), keyfunc.Options{
+	if jwks, err := keyfunc.Get(cfg.JwksUrl, keyfunc.Options{
 		Client: NewHttpClient(),
 	}); err != nil {
 		fmt.Println("Failed to get jwks from url: ", err)

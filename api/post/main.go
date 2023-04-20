@@ -10,6 +10,7 @@ import (
 )
 
 var defStore key_value.Store
+var cfg Config
 
 func main() {}
 
