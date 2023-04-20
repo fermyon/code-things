@@ -13,6 +13,7 @@ use model::Profile;
 use spin_sdk::{
     http::{Request, Response},
     http_component,
+    key_value::Store,
 };
 
 enum Api {
@@ -26,6 +27,7 @@ enum Api {
 
 #[http_component]
 fn profile_api(req: Request) -> Result<Response> {
+    let store = spin_sdk::key_value::Store::open_default()?;
     let cfg = Config::default();
 
     // parse the profile from the request
@@ -36,7 +38,7 @@ fn profile_api(req: Request) -> Result<Response> {
     };
 
     // guard against unauthenticated requests
-    let claims = match claims_from_request(&cfg, &req, &profile.id) {
+    let claims = match claims_from_request(&cfg, &req, &profile.id, &store) {
         Ok(claims) if claims.subject.is_some() => claims,
         Ok(_) => return forbidden("Token is missing 'sub'.".to_string()),
         Err(e) => return forbidden(e.to_string()),
@@ -65,8 +67,9 @@ fn claims_from_request(
     cfg: &Config,
     req: &Request,
     subject: &Option<String>,
+    store: &Store,
 ) -> Result<JWTClaims<NoCustomClaims>> {
-    let keys = auth::JsonWebKeySet::get(cfg.jwks_url.to_owned())
+    let keys = auth::JsonWebKeySet::get(cfg.jwks_url.to_owned(), store)
         .context(format!("Failed to retrieve JWKS from {:?}", cfg.jwks_url))?;
 
     let token = get_access_token(req.headers()).ok_or(anyhow!(

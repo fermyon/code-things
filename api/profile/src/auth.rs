@@ -1,3 +1,5 @@
+use chrono::{LocalResult, TimeZone, Utc};
+
 use anyhow::{bail, Result};
 use base64::{alphabet, engine, Engine as _};
 use jwt_simple::prelude::*;
@@ -45,16 +47,77 @@ pub(crate) struct JsonWebKeySet {
     keys: Vec<JsonWebKey>,
 }
 
+fn get_cached_jwks(store: &spin_sdk::key_value::Store) -> Result<bytes::Bytes> {
+    let expiry = match store.get("jwks_ttl") {
+        Ok(expiry) => expiry,
+        Err(_) => {
+            return Err(anyhow::anyhow!("No cached JWKS found."));
+        }
+    };
+    let expiry = match expiry.try_into() {
+        Ok(expiry) => expiry,
+        Err(_) => {
+            return Err(anyhow::anyhow!("Cached JWKS has invalid expiry."));
+        }
+    };
+    let expiry = match Utc.timestamp_millis_opt(i64::from_le_bytes(expiry)) {
+        LocalResult::Single(expiry) => expiry,
+        _ => {
+            return Err(anyhow::anyhow!("Cached JWKS has invalid expiry."));
+        }
+    };
+    if expiry <= Utc::now() {
+        return Err(anyhow::anyhow!("Cached JWKS has expired."));
+    }
+    match store.get("jwks") {
+        Ok(jwks) => Ok(bytes::Bytes::from(jwks)),
+        Err(_) => {
+            return Err(anyhow::anyhow!("No cached JWKS found."));
+        }
+    }
+}
+
+fn set_cached_jwks(store: &spin_sdk::key_value::Store, jwks: bytes::Bytes) -> Result<()> {
+    let expiry = Utc::now() + chrono::Duration::minutes(5);
+    let expiry = expiry.timestamp_millis().to_le_bytes();
+    store.set("jwks_ttl", expiry)?;
+    store.set("jwks", jwks)?;
+    Ok(())
+}
+
 impl JsonWebKeySet {
-    pub fn get(url: String) -> Result<Self> {
-        let res = outbound_http::send_request(
-            http::Request::builder().method("GET").uri(url).body(None)?,
-        )?;
-        let res_body = match res.body().as_ref() {
-            Some(bytes) => bytes.slice(..),
-            None => bytes::Bytes::default(),
+    pub fn get(url: String, store: &spin_sdk::key_value::Store) -> Result<Self> {
+        let jwks_bytes = match get_cached_jwks(&store) {
+            Ok(jwks) => jwks,
+            Err(cache_err) => {
+                println!("Error getting cached JWKS: {}", cache_err);
+                let req_body = http::Request::builder()
+                    .method("GET")
+                    .uri(&url)
+                    .body(None)?;
+                let res = match outbound_http::send_request(req_body) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        println!("Error getting JWKS from url {}: {}", &url, e);
+                        return Err(e.into());
+                    }
+                };
+                let res_body = match res.body().as_ref() {
+                    Some(bytes) => bytes.slice(..),
+                    None => {
+                        return Err(anyhow::anyhow!(format!(
+                            "Error getting JWKS from url {}: no body",
+                            &url
+                        )));
+                    }
+                };
+                if let Err(e) = set_cached_jwks(&store, res_body.clone()) {
+                    println!("Error caching JWKS: {}", e);
+                }
+                res_body
+            }
         };
-        Ok(serde_json::from_slice::<JsonWebKeySet>(&res_body)?)
+        Ok(serde_json::from_slice::<JsonWebKeySet>(&jwks_bytes)?)
     }
 
     pub fn verify(
