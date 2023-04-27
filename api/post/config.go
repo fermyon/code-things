@@ -2,34 +2,40 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/fermyon/spin/sdk/go/config"
+	"github.com/fermyon/spin/sdk/go/key_value"
 )
 
 // Config Helpers
 
-func configGetRequired(key string) string {
-	if val, err := config.Get(key); err != nil {
-		panic(fmt.Sprintf("Missing required config item 'jwks_uri': %v", err))
-	} else {
-		return val
+type Config struct {
+	Issuer   string
+	Audience string
+	JwksUrl  string
+	DbUrl    string
+}
+
+func GetConfig() Config {
+	domain := configGetRequired(defStore, "auth_domain")
+	return Config{
+		Issuer:   fmt.Sprintf("https://%v/", domain),
+		Audience: configGetRequired(defStore, "auth_audience"),
+		JwksUrl:  fmt.Sprintf("https://%v/.well-known/jwks.json", domain),
+		DbUrl:    configGetRequired(defStore, "db_url"),
 	}
 }
 
-func getIssuer() string {
-	domain := configGetRequired("auth_domain")
-	return fmt.Sprintf("https://%v/", domain)
-}
-
-func getAudience() string {
-	return configGetRequired("auth_audience")
-}
-
-func getJwksUri() string {
-	domain := configGetRequired("auth_domain")
-	return fmt.Sprintf("https://%v/.well-known/jwks.json", domain)
-}
-
-func getDbUrl() string {
-	return configGetRequired("db_url")
+func configGetRequired(store key_value.Store, key string) string {
+	if val, err := key_value.Get(store, key); err == nil {
+		return string(val)
+	}
+	if val, err := config.Get(key); err == nil {
+		return val
+	}
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	panic(fmt.Sprintf("Missing required config value: %v", key))
 }

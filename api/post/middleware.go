@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/MicahParks/keyfunc"
+	"github.com/fermyon/spin/sdk/go/key_value"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/golang-jwt/jwt/v4/request"
@@ -25,7 +29,7 @@ func TokenVerification(next http.Handler) http.Handler {
 				jwt.SigningMethodRS256.Alg(),
 			}))),
 		}
-		token, err := request.ParseFromRequest(req, request.OAuth2Extractor, fetchAuthSigningKey, parserOpts...)
+		token, err := request.ParseFromRequest(req, request.OAuth2Extractor, cachedJwksKeyfunc, parserOpts...)
 		if err != nil {
 			if errors.Is(err, jwt.ValidationError{}) {
 				// token parsed but was invalid
@@ -43,12 +47,12 @@ func TokenVerification(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.VerifyIssuer(getIssuer(), true) {
+		if !claims.VerifyIssuer(cfg.Issuer, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidIssuer)
 			return
 		}
 
-		if !claims.VerifyAudience(getAudience(), true) {
+		if !claims.VerifyAudience(cfg.Audience, true) {
 			renderUnauthorized(res, jwt.ErrTokenInvalidAudience)
 			return
 		}
@@ -58,14 +62,60 @@ func TokenVerification(next http.Handler) http.Handler {
 	})
 }
 
-func fetchAuthSigningKey(t *jwt.Token) (interface{}, error) {
-	jwksUri := getJwksUri()
-	if jwks, err := keyfunc.Get(jwksUri, keyfunc.Options{
+func cachedJwksKeyfunc(t *jwt.Token) (interface{}, error) {
+	if jwks, err := getCachedJwks(); err != nil {
+		fmt.Println("Failed to get jwks from cache: ", err)
+	} else {
+		return jwks.Keyfunc(t)
+	}
+	if jwks, err := keyfunc.Get(cfg.JwksUrl, keyfunc.Options{
 		Client: NewHttpClient(),
 	}); err != nil {
+		fmt.Println("Failed to get jwks from url: ", err)
 		return nil, err
 	} else {
 		return jwks.Keyfunc(t)
+	}
+}
+
+func getCachedJwks() (*keyfunc.JWKS, error) {
+	if data, err := key_value.Get(defStore, "jwks_ttl"); err != nil {
+		return nil, fmt.Errorf("Failed to get jwks_ttl from store: %v", err)
+	} else {
+		jwks_ttl := int64(binary.LittleEndian.Uint64(data))
+		if jwks_ttl > time.Now().UTC().Unix() {
+			if data, err := key_value.Get(defStore, "jwks"); err != nil {
+				return nil, fmt.Errorf("Failed to get jwks from store: %v", err)
+			} else {
+				if jwks, err := keyfunc.NewJSON(data); err != nil {
+					return nil, fmt.Errorf("Failed to parse jwks: %v", err)
+				} else {
+					return jwks, nil
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("jwks is expired")
+		}
+	}
+}
+
+func setCachedJwks(jwks *keyfunc.JWKS) {
+	data, err := json.Marshal(jwks)
+	if err != nil {
+		fmt.Println("Failed to marshal jwks: ", err)
+		return
+	}
+	err = key_value.Set(defStore, "jwks", data)
+	if err != nil {
+		fmt.Println("Failed to set jwks in store: ", err)
+		return
+	}
+	// set the ttl for the jwks key
+	jwks_ttl := uint64(time.Now().UTC().Add(24 * time.Hour).Unix())
+	jwks_data := make([]byte, 8)
+	binary.LittleEndian.PutUint64(jwks_data, jwks_ttl)
+	if err := key_value.Set(defStore, "jwks_ttl", jwks_data); err != nil {
+		fmt.Println("Failed to set jwks_ttl in store: ", err)
 	}
 }
 

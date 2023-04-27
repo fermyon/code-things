@@ -5,13 +5,25 @@ import (
 	"net/http"
 
 	spinhttp "github.com/fermyon/spin/sdk/go/http"
+	"github.com/fermyon/spin/sdk/go/key_value"
 	"github.com/go-chi/chi/v5"
 )
+
+var defStore key_value.Store
+var cfg Config
 
 func main() {}
 
 func init() {
 	spinhttp.Handle(func(res http.ResponseWriter, req *http.Request) {
+		if store, err := key_value.Open("default"); err != nil {
+			renderErrorResponse(res, err)
+			return
+		} else {
+			defer key_value.Close(defStore)
+			defStore = store
+		}
+
 		// we need to setup the router inside spin handler
 		router := chi.NewRouter()
 
